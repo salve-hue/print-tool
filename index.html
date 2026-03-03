@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Print File Downloader</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
+
+  :root {
+    --bg:        #0d1117;
+    --surface:   #161b22;
+    --border:    #30363d;
+    --border-hi: #58a6ff;
+    --text:      #e6edf3;
+    --text-sec:  #8b949e;
+    --text-dim:  #484f58;
+    --accent:    #58a6ff;
+    --green:     #3fb950;
+    --red:       #f85149;
+    --orange:    #d29922;
+    --mono:      'IBM Plex Mono', monospace;
+    --sans:      'IBM Plex Sans', sans-serif;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── HEADER ── */
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 18px 32px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: var(--surface);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .logo-mark {
+    width: 36px; height: 36px;
+    background: var(--accent);
+    display: grid;
+    place-items: center;
+    border-radius: 4px;
+    flex-shrink: 0;
+  }
+  .logo-mark svg { width: 20px; height: 20px; }
+
+  header h1 {
+    font-family: var(--mono);
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text);
+  }
+  header .sub {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-sec);
+    letter-spacing: 0.04em;
+    margin-left: auto;
+  }
+
+  /* ── MAIN LAYOUT ── */
+  main {
+    flex: 1;
+    padding: 32px;
+    max-width: 1000px;
+    width: 100%;
+    margin: 0 auto;
+  }
+
+  /* ── SETUP PANEL ── */
+  #setup-panel {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
+    overflow: hidden;
+  }
+
+  .panel-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .panel-header h2 {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-sec);
+  }
+  .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--text-dim);
+  }
+  .dot.green { background: var(--green); }
+
+  .panel-body { padding: 20px; }
+
+  .field-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin-bottom: 14px;
+  }
+
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field label {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-sec);
+  }
+  .field input {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 9px 12px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .field input:focus { border-color: var(--accent); }
+  .field input::placeholder { color: var(--text-dim); }
+
+  .field-hint {
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-top: 2px;
+  }
+
+  /* ── BUTTONS ── */
+  .btn {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    border: none;
+    border-radius: 5px;
+    padding: 10px 18px;
+    cursor: pointer;
+    transition: opacity 0.15s, transform 0.1s;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .btn:hover { opacity: 0.85; }
+  .btn:active { transform: scale(0.98); }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+  .btn-primary   { background: var(--accent); color: #0d1117; }
+  .btn-success   { background: var(--green);  color: #0d1117; }
+  .btn-danger    { background: var(--red);    color: #fff; }
+  .btn-ghost     { background: rgba(255,255,255,0.07); color: var(--text); }
+
+  /* ── STATUS BAR ── */
+  #status-bar {
+    display: none;
+    margin-top: 14px;
+    padding: 10px 14px;
+    border-radius: 5px;
+    font-family: var(--mono);
+    font-size: 12px;
+    border: 1px solid transparent;
+  }
+  #status-bar.info  { background: rgba(88,166,255,0.1); border-color: rgba(88,166,255,0.3); color: var(--accent); }
+  #status-bar.error { background: rgba(248,81,73,0.1);  border-color: rgba(248,81,73,0.3);  color: var(--red); }
+  #status-bar.ok    { background: rgba(63,185,80,0.1);  border-color: rgba(63,185,80,0.3);  color: var(--green); }
+
+  /* ── ORDERS PANEL ── */
+  #orders-panel { display: none; margin-top: 24px; }
+
+  .toolbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+  }
+  .toolbar-left  { display: flex; align-items: center; gap: 10px; flex: 1; }
+  .toolbar-right { display: flex; align-items: center; gap: 10px; }
+
+  .count-badge {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-sec);
+    padding: 4px 8px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+  }
+  .count-badge span { color: var(--accent); font-weight: 600; }
+
+  /* ── ORDER TABLE ── */
+  .order-table {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--surface);
+  }
+
+  .table-head {
+    display: grid;
+    grid-template-columns: 36px 110px 140px 1fr 80px;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+    gap: 12px;
+    align-items: center;
+  }
+  .table-head span {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-dim);
+  }
+
+  .order-row {
+    display: grid;
+    grid-template-columns: 36px 110px 140px 1fr 80px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    gap: 12px;
+    align-items: center;
+    transition: background 0.1s;
+    cursor: pointer;
+  }
+  .order-row:last-child { border-bottom: none; }
+  .order-row:hover { background: rgba(255,255,255,0.03); }
+  .order-row.selected { background: rgba(88,166,255,0.06); }
+
+  .order-row input[type="checkbox"] {
+    width: 16px; height: 16px;
+    accent-color: var(--accent);
+    cursor: pointer;
+  }
+
+  .order-num {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--accent);
+  }
+
+  .order-date {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-sec);
+  }
+
+  .order-files {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .file-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 3px;
+    background: rgba(255,255,255,0.06);
+    color: var(--text-sec);
+    width: fit-content;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .file-chip .suffix {
+    font-weight: 600;
+    padding: 1px 5px;
+    border-radius: 2px;
+    font-size: 10px;
+  }
+  .suffix.CLR { background: rgba(88,166,255,0.2);  color: var(--accent); }
+  .suffix.BLK { background: rgba(139,148,158,0.2); color: var(--text-sec); }
+  .suffix.UNS { background: rgba(210,153,34,0.2);  color: var(--orange); }
+  .suffix.UNK { background: rgba(255,255,255,0.1); color: var(--text-dim); }
+
+  .file-count {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-dim);
+    text-align: center;
+  }
+
+  /* ── PROGRESS ── */
+  #progress-wrap {
+    display: none;
+    margin-top: 16px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
+    overflow: hidden;
+  }
+
+  .progress-header {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .progress-header span {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-sec);
+  }
+  #progress-pct {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--accent);
+  }
+
+  .progress-track {
+    height: 3px;
+    background: var(--border);
+  }
+  #progress-bar {
+    height: 100%;
+    background: var(--accent);
+    width: 0%;
+    transition: width 0.3s ease;
+  }
+
+  #progress-log {
+    padding: 14px 18px;
+    max-height: 160px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .log-line {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-sec);
+    display: flex;
+    gap: 10px;
+  }
+  .log-line .ts { color: var(--text-dim); flex-shrink: 0; }
+  .log-line.ok   .msg { color: var(--green); }
+  .log-line.fail .msg { color: var(--red); }
+  .log-line.info .msg { color: var(--accent); }
+
+  /* ── EMPTY STATE ── */
+  .empty-state {
+    padding: 48px;
+    text-align: center;
+    color: var(--text-dim);
+  }
+  .empty-state p {
+    font-family: var(--mono);
+    font-size: 13px;
+    margin-top: 12px;
+  }
+
+  /* ── FOOTER ── */
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 14px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  footer span {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 0.06em;
+  }
+
+  /* Select all checkbox */
+  #select-all {
+    width: 16px; height: 16px;
+    accent-color: var(--accent);
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo-mark">
+    <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M3 4h14v2H3V4zm0 5h14v2H3V9zm0 5h9v2H3v-2z" fill="#0d1117"/>
+      <circle cx="16" cy="15" r="3" fill="#0d1117" stroke="#0d1117" stroke-width="0"/>
+      <path d="M15 14l1.5 1.5L18 13" stroke="#0d1117" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </div>
+  <h1>Print File Downloader</h1>
+  <span class="sub">Unfulfilled Orders · Shopify Admin API</span>
+</header>
+
+<main>
+
+  <!-- SETUP -->
+  <div id="setup-panel">
+    <div class="panel-header">
+      <div class="dot" id="conn-dot"></div>
+      <h2>Store Connection</h2>
+    </div>
+    <div class="panel-body">
+      <div class="field-row">
+        <div class="field">
+          <label>Store Domain</label>
+          <input type="text" id="store-domain" placeholder="yourstore.myshopify.com" autocomplete="off" spellcheck="false">
+          <span class="field-hint">Your .myshopify.com domain</span>
+        </div>
+        <div class="field">
+          <label>Admin API Token</label>
+          <input type="password" id="api-token" placeholder="shpat_••••••••••••••••••••••" autocomplete="off">
+          <span class="field-hint">Private app token with Orders read access</span>
+        </div>
+      </div>
+      <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+        <button class="btn btn-primary" onclick="loadOrders()">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1v10M1 6l5-5 5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Load Unfulfilled Orders
+        </button>
+        <button class="btn btn-ghost" onclick="saveCredentials()" title="Save to localStorage">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 2h7l1 1v7a1 1 0 01-1 1H2a1 1 0 01-1-1V3a1 1 0 011-1zm2 0v3h4V2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Save Credentials
+        </button>
+        <button class="btn btn-ghost" onclick="clearCredentials()" title="Clear saved credentials">Clear Saved</button>
+      </div>
+      <div id="status-bar"></div>
+    </div>
+  </div>
+
+  <!-- ORDERS -->
+  <div id="orders-panel">
+    <div class="toolbar">
+      <div class="toolbar-left">
+        <div class="count-badge">
+          <span id="selected-count">0</span> selected / <span id="total-count">0</span> orders
+        </div>
+        <div class="count-badge">
+          <span id="file-count-badge">0</span> print files
+        </div>
+      </div>
+      <div class="toolbar-right">
+        <button class="btn btn-ghost" onclick="selectAll()">Select All</button>
+        <button class="btn btn-ghost" onclick="selectNone()">Clear</button>
+        <button class="btn btn-success" id="download-btn" onclick="downloadSelected()" disabled>
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 1v8M3 6l3.5 3.5L10 6M1 11h11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Download ZIP
+        </button>
+      </div>
+    </div>
+
+    <div class="order-table">
+      <div class="table-head">
+        <input type="checkbox" id="select-all" onchange="toggleSelectAll(this.checked)">
+        <span>Order</span>
+        <span>Date</span>
+        <span>Files</span>
+        <span style="text-align:center;">Count</span>
+      </div>
+      <div id="order-list">
+        <div class="empty-state">
+          <p>No orders loaded yet.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- PROGRESS -->
+    <div id="progress-wrap">
+      <div class="progress-header">
+        <span>Downloading</span>
+        <span id="progress-pct">0%</span>
+      </div>
+      <div class="progress-track">
+        <div id="progress-bar"></div>
+      </div>
+      <div id="progress-log"></div>
+    </div>
+  </div>
+
+</main>
+
+<footer>
+  <span>PRINT FILE DOWNLOADER v1.0 · GITHUB PAGES</span>
+  <span id="footer-store"></span>
+</footer>
+
+<script>
+// ── PROXY ─────────────────────────────────────────────────────────
+const PROXY_URL = 'https://shopify-proxy.salve.workers.dev';
+
+// ── STATE ──────────────────────────────────────────────────────────
+let orders = [];  // {id, number, date, lineItems: [{fileUrl, suffix, variantTitle}]}
+let selected = new Set();
+
+// ── CREDENTIALS ───────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  const d = localStorage.getItem('pfd_domain');
+  const t = localStorage.getItem('pfd_token');
+  if (d) document.getElementById('store-domain').value = d;
+  if (t) document.getElementById('api-token').value = t;
+  if (d && t) setStatus('Saved credentials loaded. Click Load to fetch orders.', 'info');
+});
+
+function saveCredentials() {
+  const d = domain(), t = token();
+  if (!d || !t) { setStatus('Enter domain and token before saving.', 'error'); return; }
+  localStorage.setItem('pfd_domain', d);
+  localStorage.setItem('pfd_token', t);
+  setStatus('Credentials saved to browser storage.', 'ok');
+}
+
+function clearCredentials() {
+  localStorage.removeItem('pfd_domain');
+  localStorage.removeItem('pfd_token');
+  setStatus('Saved credentials cleared.', 'info');
+}
+
+function domain() { return document.getElementById('store-domain').value.trim().replace(/\/$/, ''); }
+function token()  { return document.getElementById('api-token').value.trim(); }
+
+// ── STATUS BAR ────────────────────────────────────────────────────
+function setStatus(msg, type) {
+  const el = document.getElementById('status-bar');
+  el.textContent = msg;
+  el.className = type;
+  el.style.display = 'block';
+}
+
+// ── VARIANT → SUFFIX ──────────────────────────────────────────────
+// Derives CLR / BLK / UNS from variant/option text.
+function deriveSuffix(variantTitle, options) {
+  const haystack = [variantTitle, ...(options || [])].join(' ').toLowerCase();
+  if (/\bclr\b|clear|stitched clear/.test(haystack))     return 'CLR';
+  if (/\bblk\b|black|stitched black/.test(haystack))     return 'BLK';
+  if (/\buns\b|unstitched|no stitch/.test(haystack))     return 'UNS';
+  return 'UNK';
+}
+
+// ── LOAD ORDERS ───────────────────────────────────────────────────
+async function loadOrders() {
+  const d = domain(), t = token();
+  if (!d || !t) { setStatus('Please enter your store domain and API token.', 'error'); return; }
+
+  setStatus('Fetching unfulfilled orders…', 'info');
+  document.getElementById('conn-dot').className = 'dot';
+
+  let allOrders = [];
+  // Start with page_info=undefined — worker handles first request
+  let pageInfo = null;
+  let hasMore  = true;
+
+  try {
+    while (hasMore) {
+      const query = pageInfo
+        ? `limit=250&page_info=${pageInfo}`
+        : `status=unfulfilled&limit=250&fields=id,order_number,created_at,line_items`;
+      const proxyUrl = `${PROXY_URL}?shop=${encodeURIComponent(d)}&query=${encodeURIComponent(query)}`;
+      const res = await fetch(proxyUrl, {
+        headers: { 'X-Shopify-Token': t, 'Content-Type': 'application/json' }
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        const errMsg = typeof err.errors === 'string' ? err.errors : JSON.stringify(err.errors || err);
+        throw new Error(`API error ${res.status}: ${errMsg}`);
+      }
+      const data = await res.json();
+      allOrders = allOrders.concat(data.orders || []);
+
+      // Pagination via proxied Link header
+      const link = res.headers.get('X-Link') || '';
+      const next = link.match(/<[^>]*page_info=([^&>]+)[^>]*>;\s*rel="next"/);
+      if (next) { pageInfo = next[1]; } else { hasMore = false; }
+    }
+  } catch (e) {
+    setStatus(`Error: ${e.message}`, 'error');
+    document.getElementById('conn-dot').className = 'dot';
+    return;
+  }
+
+  // Parse print files from line item properties
+  orders = [];
+  for (const o of allOrders) {
+    const lineItems = [];
+    for (const li of (o.line_items || [])) {
+      const props = li.properties || [];
+      const fileUrl = (props.find(p => p.name === '_Print_File_URL') || {}).value;
+      if (!fileUrl) continue;
+
+      const suffix = deriveSuffix(li.variant_title || li.title || '', [
+        li.variant_title,
+        (li.properties || []).find(p => p.name === 'Edge Style')?.value,
+        (li.properties || []).find(p => p.name === 'Stitching')?.value,
+        (li.properties || []).find(p => p.name === 'Finish')?.value,
+      ]);
+
+      lineItems.push({ fileUrl, suffix, variantTitle: li.variant_title || li.title || '' });
+    }
+    if (lineItems.length === 0) continue; // no print files on this order
+    orders.push({
+      id: o.id,
+      number: o.order_number,
+      date: new Date(o.created_at),
+      lineItems
+    });
+  }
+
+  // Sort newest first
+  orders.sort((a, b) => b.date - a.date);
+
+  document.getElementById('conn-dot').className = 'dot green';
+  document.getElementById('footer-store').textContent = d.replace('.myshopify.com', '').toUpperCase();
+  setStatus(`Loaded ${allOrders.length} unfulfilled orders — ${orders.length} with print files.`, 'ok');
+
+  renderOrders();
+  document.getElementById('orders-panel').style.display = 'block';
+  updateSelectionUI();
+}
+
+// ── RENDER ────────────────────────────────────────────────────────
+function fmt(date) {
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function renderOrders() {
+  const list = document.getElementById('order-list');
+  document.getElementById('total-count').textContent = orders.length;
+
+  if (orders.length === 0) {
+    list.innerHTML = '<div class="empty-state"><p>No unfulfilled orders with print files found.</p></div>';
+    return;
+  }
+
+  list.innerHTML = orders.map((o, idx) => {
+    const chipsHtml = o.lineItems.map(li => `
+      <div class="file-chip" title="${li.variantTitle}">
+        <span class="suffix ${li.suffix}">${li.suffix}</span>
+        ${li.variantTitle || 'Print File'}
+      </div>
+    `).join('');
+
+    return `
+      <div class="order-row" id="row-${o.id}" onclick="toggleRow(${o.id})">
+        <input type="checkbox" id="chk-${o.id}" onclick="event.stopPropagation(); toggleRow(${o.id})">
+        <div class="order-num">#${o.number}</div>
+        <div class="order-date">${fmt(o.date)}</div>
+        <div class="order-files">${chipsHtml}</div>
+        <div class="file-count">${o.lineItems.length}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+// ── SELECTION ─────────────────────────────────────────────────────
+function toggleRow(id) {
+  if (selected.has(id)) {
+    selected.delete(id);
+    document.getElementById(`row-${id}`).classList.remove('selected');
+    document.getElementById(`chk-${id}`).checked = false;
+  } else {
+    selected.add(id);
+    document.getElementById(`row-${id}`).classList.add('selected');
+    document.getElementById(`chk-${id}`).checked = true;
+  }
+  updateSelectionUI();
+}
+
+function selectAll()  { orders.forEach(o => { selected.add(o.id); document.getElementById(`row-${o.id}`).classList.add('selected'); document.getElementById(`chk-${o.id}`).checked = true; }); updateSelectionUI(); }
+function selectNone() { orders.forEach(o => { selected.delete(o.id); document.getElementById(`row-${o.id}`).classList.remove('selected'); document.getElementById(`chk-${o.id}`).checked = false; }); updateSelectionUI(); }
+function toggleSelectAll(checked) { checked ? selectAll() : selectNone(); }
+
+function updateSelectionUI() {
+  const sel = selected.size;
+  const fileCount = orders.filter(o => selected.has(o.id)).reduce((n, o) => n + o.lineItems.length, 0);
+  document.getElementById('selected-count').textContent = sel;
+  document.getElementById('file-count-badge').textContent = fileCount;
+  document.getElementById('download-btn').disabled = sel === 0;
+  document.getElementById('select-all').checked = sel > 0 && sel === orders.length;
+}
+
+// ── DOWNLOAD ──────────────────────────────────────────────────────
+function logLine(msg, type = '') {
+  const now = new Date();
+  const ts  = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
+  const log = document.getElementById('progress-log');
+  const div = document.createElement('div');
+  div.className = `log-line ${type}`;
+  div.innerHTML = `<span class="ts">${ts}</span><span class="msg">${msg}</span>`;
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+}
+
+function setProgress(done, total) {
+  const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+  document.getElementById('progress-bar').style.width = pct + '%';
+  document.getElementById('progress-pct').textContent = pct + '%';
+}
+
+async function downloadSelected() {
+  const toDownload = orders.filter(o => selected.has(o.id));
+  if (toDownload.length === 0) return;
+
+  // Build flat file list with final filenames
+  const fileList = [];
+  for (const o of toDownload) {
+    const multi = o.lineItems.length > 1;
+    o.lineItems.forEach((li, idx) => {
+      const suffix = li.suffix;
+      const name   = multi
+        ? `${o.number}-${suffix}-${idx + 1}.jpg`
+        : `${o.number}-${suffix}.jpg`;
+      fileList.push({ name, url: li.fileUrl, order: o.number });
+    });
+  }
+
+  const total = fileList.length;
+  let done = 0, failed = 0;
+
+  document.getElementById('progress-wrap').style.display = 'block';
+  document.getElementById('progress-log').innerHTML = '';
+  setProgress(0, total);
+  logLine(`Starting download of ${total} file${total !== 1 ? 's' : ''} from ${toDownload.length} orders…`, 'info');
+
+  const btn = document.getElementById('download-btn');
+  btn.disabled = true;
+  btn.textContent = 'Packaging…';
+
+  const zip = new JSZip();
+
+  for (const f of fileList) {
+    try {
+      const res = await fetch(f.url);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const blob = await res.blob();
+      zip.file(f.name, blob);
+      done++;
+      setProgress(done + failed, total);
+      logLine(`✓ ${f.name}`, 'ok');
+    } catch (e) {
+      failed++;
+      setProgress(done + failed, total);
+      logLine(`✗ ${f.name} — ${e.message}`, 'fail');
+    }
+  }
+
+  logLine(`Generating ZIP (${done} files)…`, 'info');
+
+  try {
+    const zipBlob = await zip.generateAsync({ type: 'blob', compression: 'STORE' });
+    const dateStr = new Date().toISOString().slice(0,10);
+    const zipName = `print-files-${dateStr}.zip`;
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(zipBlob);
+    a.download = zipName;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    logLine(`Done — ${zipName} downloaded (${done} ok, ${failed} failed)`, 'ok');
+  } catch (e) {
+    logLine(`ZIP generation failed: ${e.message}`, 'fail');
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = `<svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 1v8M3 6l3.5 3.5L10 6M1 11h11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Download ZIP`;
+}
+</script>
+</body>
+</html>
