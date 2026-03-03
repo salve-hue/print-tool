@@ -615,7 +615,12 @@ async function loadOrders() {
     const lineItems = [];
     for (const li of (o.line_items || [])) {
       const props = li.properties || [];
-      const fileUrl = (props.find(p => p.name === '_Print_File_URL') || {}).value;
+      const r2Url    = (props.find(p => p.name === '_Print_File_URL') || {}).value;
+      const driveUrl = (props.find(p => p.name === 'Personalization') || {}).value;
+
+      // Accept R2 URL or a Google Drive link in Personalization
+      const isDrive  = driveUrl && driveUrl.includes('drive.google.com');
+      const fileUrl  = r2Url || (isDrive ? driveUrl : null);
       if (!fileUrl) continue;
 
       const suffix = deriveSuffix(li.variant_title || li.title || '', [
@@ -625,7 +630,7 @@ async function loadOrders() {
         (li.properties || []).find(p => p.name === 'Finish')?.value,
       ]);
 
-      lineItems.push({ fileUrl, suffix, variantTitle: li.variant_title || li.title || '' });
+      lineItems.push({ fileUrl, suffix, variantTitle: li.variant_title || li.title || '', isDrive: !!isDrive && !r2Url });
     }
     if (lineItems.length === 0) continue; // no print files on this order
     orders.push({
@@ -666,6 +671,7 @@ function renderOrders() {
     const chipsHtml = o.lineItems.map(li => `
       <div class="file-chip" title="${li.variantTitle}">
         <span class="suffix ${li.suffix}">${li.suffix}</span>
+        ${li.isDrive ? '<span class="suffix" style="background:rgba(52,168,83,0.2);color:#34a853;">GDrive</span>' : ''}
         ${li.variantTitle || 'Print File'}
       </div>
     `).join('');
@@ -740,7 +746,7 @@ async function downloadSelected() {
       const name   = multi
         ? `${o.number}-${suffix}-${idx + 1}.jpg`
         : `${o.number}-${suffix}.jpg`;
-      fileList.push({ name, url: li.fileUrl, order: o.number });
+      fileList.push({ name, url: li.fileUrl, order: o.number, isDrive: li.isDrive });
     });
   }
 
@@ -760,13 +766,20 @@ async function downloadSelected() {
 
   for (const f of fileList) {
     try {
-      const res = await fetch(f.url);
+      let fetchUrl = f.url;
+      if (f.isDrive) {
+        // Extract file ID and route through proxy worker to bypass CORS/auth wall
+        const idMatch = f.url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+        if (!idMatch) throw new Error('Could not parse Drive file ID');
+        fetchUrl = `${PROXY_URL}/gdrive?id=${idMatch[1]}`;
+      }
+      const res = await fetch(fetchUrl);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const blob = await res.blob();
       zip.file(f.name, blob);
       done++;
       setProgress(done + failed, total);
-      logLine(`✓ ${f.name}`, 'ok');
+      logLine(`✓ ${f.name}${f.isDrive ? ' (Drive)' : ''}`, 'ok');
     } catch (e) {
       failed++;
       setProgress(done + failed, total);
