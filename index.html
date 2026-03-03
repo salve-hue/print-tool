@@ -592,7 +592,8 @@ async function loadOrders() {
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(`API error ${res.status}: ${err.errors || res.statusText}`);
+        const errMsg = typeof err.errors === 'string' ? err.errors : JSON.stringify(err.errors || err);
+        throw new Error(`API error ${res.status}: ${errMsg}`);
       }
       const data = await res.json();
       allOrders = allOrders.concat(data.orders || []);
