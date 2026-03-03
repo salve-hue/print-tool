@@ -577,15 +577,14 @@ async function loadOrders() {
   document.getElementById('conn-dot').className = 'dot';
 
   let allOrders = [];
-  // Start with page_info=undefined — worker handles first request
-  let pageInfo = null;
-  let hasMore  = true;
 
-  try {
+  // Helper: fetch all pages for a given starting query
+  async function fetchAllPages(startQuery) {
+    const results = [];
+    let pageInfo = null;
+    let hasMore  = true;
     while (hasMore) {
-      const query = pageInfo
-        ? `limit=250&page_info=${pageInfo}`
-        : `status=unfulfilled&limit=250&fields=id,order_number,created_at,line_items`;
+      const query    = pageInfo ? `limit=250&page_info=${pageInfo}` : startQuery;
       const proxyUrl = `${PROXY_URL}?shop=${encodeURIComponent(d)}&query=${encodeURIComponent(query)}`;
       const res = await fetch(proxyUrl, {
         headers: { 'X-Shopify-Token': t, 'Content-Type': 'application/json' }
@@ -596,12 +595,23 @@ async function loadOrders() {
         throw new Error(`API error ${res.status}: ${errMsg}`);
       }
       const data = await res.json();
-      allOrders = allOrders.concat(data.orders || []);
-
-      // Pagination via proxied Link header
+      results.push(...(data.orders || []));
       const link = res.headers.get('X-Link') || '';
-      const next = link.match(/<[^>]*page_info=([^&>]+)[^>]*>;\s*rel="next"/);
+      const next = link.match(/page_info=([^&>]+)[^>]*>;\s*rel="next"/);
       if (next) { pageInfo = next[1]; } else { hasMore = false; }
+    }
+    return results;
+  }
+
+  try {
+    // Fetch standard unfulfilled + ETSY- prefixed orders separately then merge
+    const [standard, etsy] = await Promise.all([
+      fetchAllPages('status=unfulfilled&limit=250&fields=id,order_number,name,created_at,line_items'),
+      fetchAllPages('status=unfulfilled&limit=250&fields=id,order_number,name,created_at,line_items&name=ETSY-'),
+    ]);
+    const seen = new Set();
+    for (const o of [...standard, ...etsy]) {
+      if (!seen.has(o.id)) { seen.add(o.id); allOrders.push(o); }
     }
   } catch (e) {
     setStatus(`Error: ${e.message}`, 'error');
@@ -636,6 +646,7 @@ async function loadOrders() {
     orders.push({
       id: o.id,
       number: o.order_number,
+      name: o.name || ('#' + o.order_number),
       date: new Date(o.created_at),
       lineItems
     });
@@ -679,7 +690,7 @@ function renderOrders() {
     return `
       <div class="order-row" id="row-${o.id}" onclick="toggleRow(${o.id})">
         <input type="checkbox" id="chk-${o.id}" onclick="event.stopPropagation(); toggleRow(${o.id})">
-        <div class="order-num">#${o.number}</div>
+        <div class="order-num">${o.name || '#' + o.number}</div>
         <div class="order-date">${fmt(o.date)}</div>
         <div class="order-files">${chipsHtml}</div>
         <div class="file-count">${o.lineItems.length}</div>
@@ -743,9 +754,10 @@ async function downloadSelected() {
     const multi = o.lineItems.length > 1;
     o.lineItems.forEach((li, idx) => {
       const suffix = li.suffix;
+      const label  = o.name || o.number;
       const name   = multi
-        ? `${o.number}-${suffix}-${idx + 1}.jpg`
-        : `${o.number}-${suffix}.jpg`;
+        ? `${label}-${suffix}-${idx + 1}.jpg`
+        : `${label}-${suffix}.jpg`;
       fileList.push({ name, url: li.fileUrl, order: o.number, isDrive: li.isDrive });
     });
   }
