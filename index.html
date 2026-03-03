@@ -462,6 +462,13 @@
 
   <!-- ORDERS -->
   <div id="orders-panel">
+    <div style="display:flex; gap:10px; align-items:center; margin-bottom:12px; flex-wrap:wrap;">
+      <label style="font-family:var(--mono); font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:0.1em; color:var(--text-sec);">Filter by date:</label>
+      <input type="date" id="filter-from" onchange="applyDateFilter()" style="background:var(--bg); border:1px solid var(--border); border-radius:5px; padding:6px 10px; color:var(--text); font-family:var(--mono); font-size:12px; outline:none;">
+      <span style="font-family:var(--mono); font-size:11px; color:var(--text-dim);">to</span>
+      <input type="date" id="filter-to" onchange="applyDateFilter()" style="background:var(--bg); border:1px solid var(--border); border-radius:5px; padding:6px 10px; color:var(--text); font-family:var(--mono); font-size:12px; outline:none;">
+      <button class="btn btn-ghost" style="padding:6px 12px; font-size:11px;" onclick="clearDateFilter()">Clear</button>
+    </div>
     <div class="toolbar">
       <div class="toolbar-left">
         <div class="count-badge">
@@ -582,7 +589,7 @@ async function loadOrders() {
 
   try {
     while (hasMore) {
-      const query    = pageInfo ? `limit=250&page_info=${pageInfo}` : `status=unfulfilled&limit=250&fields=id,order_number,created_at,line_items`;
+      const query    = pageInfo ? `limit=250&page_info=${pageInfo}` : `status=unfulfilled&limit=250&fields=id,order_number,name,created_at,line_items`;
       const proxyUrl = `${PROXY_URL}?shop=${encodeURIComponent(d)}&query=${encodeURIComponent(query)}`;
       const res = await fetch(proxyUrl, {
         headers: { 'X-Shopify-Token': t, 'Content-Type': 'application/json' }
@@ -604,9 +611,10 @@ async function loadOrders() {
     return;
   }
 
-  // Parse print files from line item properties
+  // Parse print files from line item properties — skip ETSY- imported orders
   orders = [];
   for (const o of allOrders) {
+    if ((o.name || '').toUpperCase().startsWith('ETSY-')) continue;
     const lineItems = [];
     for (const li of (o.line_items || [])) {
       const props = li.properties || [];
@@ -638,8 +646,36 @@ async function loadOrders() {
   document.getElementById('footer-store').textContent = d.replace('.myshopify.com', '').toUpperCase();
   setStatus(`Loaded ${allOrders.length} unfulfilled orders — ${orders.length} with print files.`, 'ok');
 
+  filteredOrders = [...orders];
   renderOrders();
   document.getElementById('orders-panel').style.display = 'block';
+  updateSelectionUI();
+}
+
+// ── DATE FILTER ──────────────────────────────────────────────────
+let filteredOrders = [];
+
+function applyDateFilter() {
+  const fromVal = document.getElementById('filter-from').value;
+  const toVal   = document.getElementById('filter-to').value;
+  const from    = fromVal ? new Date(fromVal + 'T00:00:00') : null;
+  const to      = toVal   ? new Date(toVal   + 'T23:59:59') : null;
+  filteredOrders = orders.filter(o => {
+    if (from && o.date < from) return false;
+    if (to   && o.date > to)   return false;
+    return true;
+  });
+  selected.clear();
+  renderOrders();
+  updateSelectionUI();
+}
+
+function clearDateFilter() {
+  document.getElementById('filter-from').value = '';
+  document.getElementById('filter-to').value   = '';
+  filteredOrders = [...orders];
+  selected.clear();
+  renderOrders();
   updateSelectionUI();
 }
 
@@ -650,14 +686,14 @@ function fmt(date) {
 
 function renderOrders() {
   const list = document.getElementById('order-list');
-  document.getElementById('total-count').textContent = orders.length;
+  document.getElementById('total-count').textContent = filteredOrders.length;
 
-  if (orders.length === 0) {
-    list.innerHTML = '<div class="empty-state"><p>No unfulfilled orders with print files found.</p></div>';
+  if (filteredOrders.length === 0) {
+    list.innerHTML = '<div class="empty-state"><p>No orders match the current filter.</p></div>';
     return;
   }
 
-  list.innerHTML = orders.map((o, idx) => {
+  list.innerHTML = filteredOrders.map((o, idx) => {
     const chipsHtml = o.lineItems.map(li => `
       <div class="file-chip" title="${li.variantTitle}">
         <span class="suffix ${li.suffix}">${li.suffix}</span>
@@ -691,17 +727,17 @@ function toggleRow(id) {
   updateSelectionUI();
 }
 
-function selectAll()  { orders.forEach(o => { selected.add(o.id); document.getElementById(`row-${o.id}`).classList.add('selected'); document.getElementById(`chk-${o.id}`).checked = true; }); updateSelectionUI(); }
-function selectNone() { orders.forEach(o => { selected.delete(o.id); document.getElementById(`row-${o.id}`).classList.remove('selected'); document.getElementById(`chk-${o.id}`).checked = false; }); updateSelectionUI(); }
+function selectAll()  { filteredOrders.forEach(o => { selected.add(o.id); document.getElementById(`row-${o.id}`).classList.add('selected'); document.getElementById(`chk-${o.id}`).checked = true; }); updateSelectionUI(); }
+function selectNone() { filteredOrders.forEach(o => { selected.delete(o.id); document.getElementById(`row-${o.id}`).classList.remove('selected'); document.getElementById(`chk-${o.id}`).checked = false; }); updateSelectionUI(); }
 function toggleSelectAll(checked) { checked ? selectAll() : selectNone(); }
 
 function updateSelectionUI() {
   const sel = selected.size;
-  const fileCount = orders.filter(o => selected.has(o.id)).reduce((n, o) => n + o.lineItems.length, 0);
+  const fileCount = filteredOrders.filter(o => selected.has(o.id)).reduce((n, o) => n + o.lineItems.length, 0);
   document.getElementById('selected-count').textContent = sel;
   document.getElementById('file-count-badge').textContent = fileCount;
   document.getElementById('download-btn').disabled = sel === 0;
-  document.getElementById('select-all').checked = sel > 0 && sel === orders.length;
+  document.getElementById('select-all').checked = sel > 0 && sel === filteredOrders.length;
 }
 
 // ── DOWNLOAD ──────────────────────────────────────────────────────
@@ -723,7 +759,7 @@ function setProgress(done, total) {
 }
 
 async function downloadSelected() {
-  const toDownload = orders.filter(o => selected.has(o.id));
+  const toDownload = filteredOrders.filter(o => selected.has(o.id));
   if (toDownload.length === 0) return;
 
   // Build flat file list with final filenames
