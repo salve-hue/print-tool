@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#161b22">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
 <title>Print File Downloader</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
@@ -590,7 +593,7 @@ async function loadOrders() {
 
   try {
     while (hasMore) {
-      const query    = pageInfo ? `limit=250&page_info=${pageInfo}` : `status=unfulfilled&limit=250&fields=id,order_number,name,created_at,line_items`;
+      const query    = pageInfo ? `limit=250&page_info=${pageInfo}` : `status=unfulfilled&limit=250&fields=id,order_number,name,created_at,fulfillment_status,line_items`;
       const proxyUrl = `${PROXY_URL}?shop=${encodeURIComponent(d)}&query=${encodeURIComponent(query)}`;
       const res = await fetch(proxyUrl, {
         headers: { 'X-Shopify-Token': t, 'Content-Type': 'application/json' }
@@ -616,6 +619,9 @@ async function loadOrders() {
   orders = [];
   for (const o of allOrders) {
     if ((o.name || '').toUpperCase().startsWith('ETSY-')) continue;
+    // Strictly exclude any order that is fulfilled or partially fulfilled
+    const fs = (o.fulfillment_status || '').toLowerCase();
+    if (fs === 'fulfilled' || fs === 'partial') continue;
     const lineItems = [];
     for (const li of (o.line_items || [])) {
       const props = li.properties || [];
@@ -831,6 +837,13 @@ async function downloadSelected() {
 
   btn.disabled = false;
   btn.innerHTML = `<svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 1v8M3 6l3.5 3.5L10 6M1 11h11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Download ZIP`;
+}
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js');
+  });
 }
 </script>
 </body>
