@@ -462,12 +462,13 @@
 
   <!-- ORDERS -->
   <div id="orders-panel">
-    <div style="display:flex; gap:10px; align-items:center; margin-bottom:12px; flex-wrap:wrap;">
+    <div style="display:flex; gap:10px; align-items:center; margin-bottom:12px; flex-wrap:wrap; background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:10px 14px;">
       <label style="font-family:var(--mono); font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:0.1em; color:var(--text-sec);">Filter by date:</label>
-      <input type="date" id="filter-from" onchange="applyDateFilter()" style="background:var(--bg); border:1px solid var(--border); border-radius:5px; padding:6px 10px; color:var(--text); font-family:var(--mono); font-size:12px; outline:none;">
-      <span style="font-family:var(--mono); font-size:11px; color:var(--text-dim);">to</span>
-      <input type="date" id="filter-to" onchange="applyDateFilter()" style="background:var(--bg); border:1px solid var(--border); border-radius:5px; padding:6px 10px; color:var(--text); font-family:var(--mono); font-size:12px; outline:none;">
-      <button class="btn btn-ghost" style="padding:6px 12px; font-size:11px;" onclick="clearDateFilter()">Clear</button>
+      <input type="date" id="filter-from" onchange="applyDateFilter()" style="background:var(--bg); border:1px solid var(--border); border-radius:5px; padding:6px 10px; color:var(--text); font-family:var(--mono); font-size:12px; outline:none; color-scheme:dark;">
+      <span style="font-family:var(--mono); font-size:11px; color:var(--text-sec);">→</span>
+      <input type="date" id="filter-to" onchange="applyDateFilter()" style="background:var(--bg); border:1px solid var(--border); border-radius:5px; padding:6px 10px; color:var(--text); font-family:var(--mono); font-size:12px; outline:none; color-scheme:dark;">
+      <button class="btn btn-ghost" style="padding:6px 14px; font-size:11px;" onclick="clearDateFilter()">Clear</button>
+      <span id="filter-status" style="font-family:var(--mono); font-size:11px; color:var(--accent); margin-left:4px;"></span>
     </div>
     <div class="toolbar">
       <div class="toolbar-left">
@@ -665,6 +666,12 @@ function applyDateFilter() {
     if (to   && o.date > to)   return false;
     return true;
   });
+  const fs = document.getElementById('filter-status');
+  if (from || to) {
+    fs.textContent = `${filteredOrders.length} of ${orders.length} orders shown`;
+  } else {
+    fs.textContent = '';
+  }
   selected.clear();
   renderOrders();
   updateSelectionUI();
@@ -673,6 +680,7 @@ function applyDateFilter() {
 function clearDateFilter() {
   document.getElementById('filter-from').value = '';
   document.getElementById('filter-to').value   = '';
+  document.getElementById('filter-status').textContent = '';
   filteredOrders = [...orders];
   selected.clear();
   renderOrders();
