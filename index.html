@@ -621,7 +621,8 @@ async function loadOrders() {
 
     // Check if it's an Etsy order and extract the number without the prefix
     const isEtsy = (o.name || '').toUpperCase().startsWith('ETSY-');
-    const displayOrderNumber = isEtsy ? o.name.replace(/^ETSY-/i, '') : o.number;
+    // FIX: Using o.order_number for Shopify orders to prevent #undefined
+    const displayOrderNumber = isEtsy ? o.name.replace(/^ETSY-/i, '') : o.order_number;
 
     const lineItems = [];
     for (const li of (o.line_items || [])) {
@@ -634,10 +635,11 @@ async function loadOrders() {
       if (!fileUrl) {
         for (const p of props) {
           if (typeof p.value === 'string') {
-            // Use regex to extract the URL specifically in case it's buried in text
-            const match = p.value.match(/(https:\/\/files\.playmatstudio\.com\/\S+)/i);
+            // FIX: Use regex to extract the URL, ignoring whitespace and trailing punctuation
+            const match = p.value.match(/(https:\/\/files\.playmatstudio\.com\/[^"\s<>]+)/i);
             if (match) {
-              fileUrl = match[1];
+              // Strip off any trailing commas, periods, or brackets that might have been caught
+              fileUrl = match[1].replace(/[.,;!?)\]'"]+$/, '');
               break;
             }
           }
