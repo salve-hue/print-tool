@@ -81,7 +81,7 @@
   main {
     flex: 1;
     padding: 32px;
-    max-width: 1000px;
+    max-width: 1100px;
     width: 100%;
     margin: 0 auto;
   }
@@ -114,7 +114,8 @@
     border-radius: 50%;
     background: var(--text-dim);
   }
-  .dot.green { background: var(--green); }
+  .dot.green  { background: var(--green); }
+  .dot.orange { background: var(--orange); }
 
   .panel-body { padding: 20px; }
 
@@ -203,7 +204,7 @@
     margin-bottom: 14px;
     flex-wrap: wrap;
   }
-  .toolbar-left  { display: flex; align-items: center; gap: 10px; flex: 1; }
+  .toolbar-left  { display: flex; align-items: center; gap: 10px; flex: 1; flex-wrap: wrap; }
   .toolbar-right { display: flex; align-items: center; gap: 10px; }
 
   .count-badge {
@@ -216,6 +217,22 @@
   }
   .count-badge span { color: var(--accent); font-weight: 600; }
 
+  /* ── ENHANCE INDICATOR (toolbar badge) ── */
+  #enhance-indicator {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-dim);
+    padding: 4px 8px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    transition: all 0.2s;
+  }
+  #enhance-indicator.active {
+    color: var(--green);
+    border-color: rgba(63,185,80,0.4);
+    background: rgba(63,185,80,0.07);
+  }
+
   /* ── ORDER TABLE ── */
   .order-table {
     border: 1px solid var(--border);
@@ -226,7 +243,7 @@
 
   .table-head {
     display: grid;
-    grid-template-columns: 36px 110px 140px 1fr 80px;
+    grid-template-columns: 36px 150px 100px 120px 1fr 60px;
     padding: 10px 16px;
     border-bottom: 1px solid var(--border);
     background: var(--bg);
@@ -244,8 +261,8 @@
 
   .order-row {
     display: grid;
-    grid-template-columns: 36px 110px 140px 1fr 80px;
-    padding: 12px 16px;
+    grid-template-columns: 36px 150px 100px 120px 1fr 60px;
+    padding: 10px 16px;
     border-bottom: 1px solid var(--border);
     gap: 12px;
     align-items: center;
@@ -261,6 +278,41 @@
     accent-color: var(--accent);
     cursor: pointer;
   }
+
+  /* ── THUMBNAIL CELL ── */
+  .thumb-cell {
+    width: 100%;
+    height: 80px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--bg);
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    position: relative;
+  }
+  .thumb-cell img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+  }
+  .thumb-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .thumb-placeholder.loading { color: var(--accent); }
+  .thumb-placeholder.error   { color: var(--red); }
 
   .order-num {
     font-family: var(--mono);
@@ -405,11 +457,146 @@
     letter-spacing: 0.06em;
   }
 
-  /* Select all checkbox */
+  /* ── SELECT ALL ── */
   #select-all {
     width: 16px; height: 16px;
     accent-color: var(--accent);
     cursor: pointer;
+  }
+
+  /* ── ENHANCEMENT PANEL ── */
+  #enhance-panel {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
+    overflow: hidden;
+    margin-bottom: 16px;
+  }
+  #enhance-panel .panel-header {
+    cursor: pointer;
+    user-select: none;
+  }
+  #enhance-panel .panel-header:hover { background: rgba(255,255,255,0.02); }
+  #enhance-toggle-icon {
+    margin-left: auto;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-dim);
+    transition: transform 0.2s;
+  }
+  #enhance-toggle-icon.open { transform: rotate(180deg); }
+
+  #enhance-body { padding: 16px 20px; }
+
+  .preset-controls {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .preset-controls label {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-sec);
+    white-space: nowrap;
+  }
+
+  select.preset-select {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 7px 10px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 12px;
+    outline: none;
+    cursor: pointer;
+    min-width: 160px;
+  }
+  select.preset-select:focus { border-color: var(--accent); }
+
+  /* ── PRESET EDITOR ── */
+  #preset-editor {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+  }
+  .editor-heading {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-sec);
+    margin-bottom: 14px;
+  }
+  .sliders-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px 32px;
+    margin: 14px 0 18px;
+  }
+  .slider-group { display: flex; flex-direction: column; gap: 8px; }
+  .slider-label {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+  .slider-label .sname {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-sec);
+  }
+  .slider-label .sval {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--accent);
+    min-width: 28px;
+    text-align: right;
+  }
+  input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    border: 2px solid var(--bg);
+    box-shadow: 0 0 0 1px var(--accent);
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    border: 2px solid var(--bg);
+    box-shadow: 0 0 0 1px var(--accent);
+  }
+  .slider-range-hint {
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--text-dim);
+    margin-top: 2px;
   }
 </style>
 </head>
@@ -463,7 +650,9 @@
   </div>
 
   <div id="orders-panel">
-    <div style="display:flex; gap:10px; align-items:center; margin-bottom:12px; flex-wrap:wrap; background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:10px 14px;">
+
+    <!-- Date filter bar -->
+    <div style="display:flex; gap:10px; align-items:center; margin-bottom:16px; flex-wrap:wrap; background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:10px 14px;">
       <label style="font-family:var(--mono); font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:0.1em; color:var(--text-sec);">Filter by date:</label>
       <input type="date" id="filter-from" onchange="applyDateFilter()" style="background:var(--bg); border:1px solid var(--border); border-radius:5px; padding:6px 10px; color:var(--text); font-family:var(--mono); font-size:12px; outline:none; color-scheme:dark;">
       <span style="font-family:var(--mono); font-size:11px; color:var(--text-sec);">→</span>
@@ -471,6 +660,83 @@
       <button class="btn btn-ghost" style="padding:6px 14px; font-size:11px;" onclick="clearDateFilter()">Clear</button>
       <span id="filter-status" style="font-family:var(--mono); font-size:11px; color:var(--accent); margin-left:4px;"></span>
     </div>
+
+    <!-- Enhancement panel -->
+    <div id="enhance-panel">
+      <div class="panel-header" onclick="toggleEnhancePanel()">
+        <div class="dot" id="enhance-dot"></div>
+        <h2>Image Enhancements</h2>
+        <span id="enhance-toggle-icon">▾</span>
+      </div>
+      <div id="enhance-body" style="display:none;">
+        <div class="preset-controls">
+          <label>Preset:</label>
+          <select id="active-preset-select" class="preset-select" onchange="setActivePreset(this.value)">
+            <option value="">None (original files)</option>
+          </select>
+          <button class="btn btn-ghost" style="padding:6px 14px; font-size:11px;" onclick="openPresetEditor(null)">+ New Preset</button>
+          <button class="btn btn-ghost" id="edit-preset-btn" style="padding:6px 14px; font-size:11px;" onclick="openPresetEditor(activePresetId)" disabled>Edit</button>
+          <button class="btn btn-danger" id="del-preset-btn" style="padding:6px 14px; font-size:11px;" onclick="confirmDeletePreset()" disabled>Delete</button>
+        </div>
+
+        <!-- Inline editor -->
+        <div id="preset-editor" style="display:none;">
+          <div class="editor-heading" id="editor-title">New Preset</div>
+          <div class="field" style="max-width:320px; margin-bottom:4px;">
+            <label>Preset Name</label>
+            <input type="text" id="editor-name" placeholder="e.g. Vivid Print">
+          </div>
+          <div class="sliders-grid">
+            <div class="slider-group">
+              <div class="slider-label">
+                <span class="sname">Brightness</span>
+                <span class="sval" id="v-brightness">0</span>
+              </div>
+              <input type="range" min="-100" max="100" value="0" id="s-brightness" oninput="syncSlider('brightness')">
+              <div class="slider-range-hint"><span>-100</span><span>+100</span></div>
+            </div>
+            <div class="slider-group">
+              <div class="slider-label">
+                <span class="sname">Contrast</span>
+                <span class="sval" id="v-contrast">0</span>
+              </div>
+              <input type="range" min="-100" max="100" value="0" id="s-contrast" oninput="syncSlider('contrast')">
+              <div class="slider-range-hint"><span>-100</span><span>+100</span></div>
+            </div>
+            <div class="slider-group">
+              <div class="slider-label">
+                <span class="sname">Saturation</span>
+                <span class="sval" id="v-saturation">0</span>
+              </div>
+              <input type="range" min="-100" max="100" value="0" id="s-saturation" oninput="syncSlider('saturation')">
+              <div class="slider-range-hint"><span>-100</span><span>+100</span></div>
+            </div>
+            <div class="slider-group">
+              <div class="slider-label">
+                <span class="sname">Vibrance</span>
+                <span class="sval" id="v-vibrance">0</span>
+              </div>
+              <input type="range" min="-100" max="100" value="0" id="s-vibrance" oninput="syncSlider('vibrance')">
+              <div class="slider-range-hint"><span>-100</span><span>+100</span></div>
+            </div>
+            <div class="slider-group">
+              <div class="slider-label">
+                <span class="sname">Sharpness</span>
+                <span class="sval" id="v-sharpness">0</span>
+              </div>
+              <input type="range" min="0" max="100" value="0" id="s-sharpness" oninput="syncSlider('sharpness')">
+              <div class="slider-range-hint"><span>0</span><span>100</span></div>
+            </div>
+          </div>
+          <div style="display:flex; gap:10px;">
+            <button class="btn btn-primary" style="font-size:11px; padding:8px 16px;" onclick="savePreset()">Save Preset</button>
+            <button class="btn btn-ghost" style="font-size:11px; padding:8px 16px;" onclick="closePresetEditor()">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toolbar -->
     <div class="toolbar">
       <div class="toolbar-left">
         <div class="count-badge">
@@ -479,6 +745,7 @@
         <div class="count-badge">
           <span id="file-count-badge">0</span> print files
         </div>
+        <div id="enhance-indicator">No Enhancement</div>
       </div>
       <div class="toolbar-right">
         <button class="btn btn-ghost" onclick="selectAll()">Select All</button>
@@ -493,6 +760,7 @@
     <div class="order-table">
       <div class="table-head">
         <input type="checkbox" id="select-all" onchange="toggleSelectAll(this.checked)">
+        <span>Preview</span>
         <span>Order</span>
         <span>Date</span>
         <span>Files</span>
@@ -507,7 +775,7 @@
 
     <div id="progress-wrap">
       <div class="progress-header">
-        <span>Downloading</span>
+        <span id="progress-label">Downloading</span>
         <span id="progress-pct">0%</span>
       </div>
       <div class="progress-track">
@@ -520,7 +788,7 @@
 </main>
 
 <footer>
-  <span>PRINT FILE DOWNLOADER v1.0 · GITHUB PAGES</span>
+  <span>PRINT FILE DOWNLOADER v1.1 · GITHUB PAGES</span>
   <span id="footer-store"></span>
 </footer>
 
@@ -529,7 +797,8 @@
 const PROXY_URL = 'https://shopify-proxy.salve.workers.dev';
 
 // ── STATE ──────────────────────────────────────────────────────────
-let orders = [];  // {id, number, date, lineItems: [{fileUrl, suffix, variantTitle}]}
+let orders = [];
+let filteredOrders = [];
 let selected = new Set();
 
 // ── CREDENTIALS ───────────────────────────────────────────────────
@@ -539,6 +808,8 @@ window.addEventListener('DOMContentLoaded', () => {
   if (d) document.getElementById('store-domain').value = d;
   if (t) document.getElementById('api-token').value = t;
   if (d && t) setStatus('Saved credentials loaded. Click Load to fetch orders.', 'info');
+  loadPresetsFromStorage();
+  renderPresetSelect();
 });
 
 function saveCredentials() {
@@ -567,7 +838,6 @@ function setStatus(msg, type) {
 }
 
 // ── VARIANT → SUFFIX ──────────────────────────────────────────────
-// Derives CLR / BLK / UNS from variant/option text.
 function deriveSuffix(variantTitle, options) {
   const haystack = [variantTitle, ...(options || [])].join(' ').toLowerCase();
   if (/\bclr\b|clear|stitched clear/.test(haystack))     return 'CLR';
@@ -585,8 +855,8 @@ async function loadOrders() {
   document.getElementById('conn-dot').className = 'dot';
 
   let allOrders = [];
-  let pageInfo = null;
-  let hasMore  = true;
+  let pageInfo  = null;
+  let hasMore   = true;
 
   try {
     while (hasMore) {
@@ -612,43 +882,30 @@ async function loadOrders() {
     return;
   }
 
-  // Parse print files from line item properties
   orders = [];
   for (const o of allOrders) {
-    // Strictly exclude any order that is fulfilled or partially fulfilled
     const fs = (o.fulfillment_status || '').toLowerCase();
     if (fs === 'fulfilled' || fs === 'partial') continue;
 
-    // Check if it's an Etsy order and extract the number without the prefix
     const isEtsy = (o.name || '').toUpperCase().startsWith('ETSY-');
-    // FIX: Using o.order_number for Shopify orders to prevent #undefined
     const displayOrderNumber = isEtsy ? o.name.replace(/^ETSY-/i, '') : o.order_number;
 
     const lineItems = [];
     for (const li of (o.line_items || [])) {
       const props = li.properties || [];
-      
-      // 1. Try to find the standard hidden property
       let fileUrl = (props.find(p => p.name === '_Print_File_URL') || {}).value;
-
-      // 2. If no standard property, scan for the playmatstudio link in Personalization or other properties
       if (!fileUrl) {
         for (const p of props) {
           if (typeof p.value === 'string') {
-            // FIX: Use regex to extract the URL, ignoring whitespace and trailing punctuation
             const match = p.value.match(/(https:\/\/files\.playmatstudio\.com\/[^"\s<>]+)/i);
             if (match) {
-              // Strip off any trailing commas, periods, or brackets that might have been caught
               fileUrl = match[1].replace(/[.,;!?)\]'"]+$/, '');
               break;
             }
           }
         }
       }
-
       if (!fileUrl) continue;
-      
-      // Clean up accidental quotes or periods at the end of user-provided links
       fileUrl = fileUrl.replace(/["']$/, '');
 
       const suffix = deriveSuffix(li.variant_title || li.title || '', [
@@ -660,16 +917,10 @@ async function loadOrders() {
 
       lineItems.push({ fileUrl, suffix, variantTitle: li.variant_title || li.title || '' });
     }
-    if (lineItems.length === 0) continue; // no print files on this order
-    orders.push({
-      id: o.id,
-      number: displayOrderNumber,
-      date: new Date(o.created_at),
-      lineItems
-    });
+    if (lineItems.length === 0) continue;
+    orders.push({ id: o.id, number: displayOrderNumber, date: new Date(o.created_at), lineItems });
   }
 
-  // Sort newest first
   orders.sort((a, b) => b.date - a.date);
 
   document.getElementById('conn-dot').className = 'dot green';
@@ -683,8 +934,6 @@ async function loadOrders() {
 }
 
 // ── DATE FILTER ──────────────────────────────────────────────────
-let filteredOrders = [];
-
 function applyDateFilter() {
   const fromVal = document.getElementById('filter-from').value;
   const toVal   = document.getElementById('filter-to').value;
@@ -730,7 +979,7 @@ function renderOrders() {
     return;
   }
 
-  list.innerHTML = filteredOrders.map((o, idx) => {
+  list.innerHTML = filteredOrders.map(o => {
     const chipsHtml = o.lineItems.map(li => `
       <div class="file-chip" title="${li.variantTitle}">
         <span class="suffix ${li.suffix}">${li.suffix}</span>
@@ -741,6 +990,9 @@ function renderOrders() {
     return `
       <div class="order-row" id="row-${o.id}" onclick="toggleRow(${o.id})">
         <input type="checkbox" id="chk-${o.id}" onclick="event.stopPropagation(); toggleRow(${o.id})">
+        <div class="thumb-cell" onclick="event.stopPropagation();">
+          <div class="thumb-placeholder" data-order-id="${o.id}">· · ·</div>
+        </div>
         <div class="order-num">#${o.number}</div>
         <div class="order-date">${fmt(o.date)}</div>
         <div class="order-files">${chipsHtml}</div>
@@ -748,6 +1000,49 @@ function renderOrders() {
       </div>
     `;
   }).join('');
+
+  // Observe all thumbnail placeholders for lazy loading
+  document.querySelectorAll('.thumb-placeholder').forEach(el => thumbObserver.observe(el));
+}
+
+// ── LAZY THUMBNAIL LOADING ────────────────────────────────────────
+const thumbObserver = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (!entry.isIntersecting) return;
+    thumbObserver.unobserve(entry.target);
+    loadThumbnail(entry.target);
+  });
+}, { rootMargin: '120px' });
+
+async function loadThumbnail(placeholder) {
+  const orderId = placeholder.dataset.orderId;
+  const order   = orders.find(o => String(o.id) === String(orderId));
+  if (!order || !order.lineItems[0]) return;
+
+  placeholder.textContent = 'Loading…';
+  placeholder.classList.add('loading');
+
+  try {
+    const res = await fetch(order.lineItems[0].fileUrl);
+    if (!res.ok) throw new Error('fetch failed');
+    const blob   = await res.blob();
+    const objUrl = URL.createObjectURL(blob);
+    const img    = document.createElement('img');
+    img.alt      = `Order #${order.number}`;
+    img.onload   = () => URL.revokeObjectURL(objUrl);
+    img.onerror  = () => {
+      URL.revokeObjectURL(objUrl);
+      placeholder.textContent = 'Error';
+      placeholder.classList.remove('loading');
+      placeholder.classList.add('error');
+    };
+    img.src = objUrl;
+    placeholder.replaceWith(img);
+  } catch (e) {
+    placeholder.textContent = 'Error';
+    placeholder.classList.remove('loading');
+    placeholder.classList.add('error');
+  }
 }
 
 // ── SELECTION ─────────────────────────────────────────────────────
@@ -764,17 +1059,283 @@ function toggleRow(id) {
   updateSelectionUI();
 }
 
-function selectAll()  { filteredOrders.forEach(o => { selected.add(o.id); document.getElementById(`row-${o.id}`).classList.add('selected'); document.getElementById(`chk-${o.id}`).checked = true; }); updateSelectionUI(); }
-function selectNone() { filteredOrders.forEach(o => { selected.delete(o.id); document.getElementById(`row-${o.id}`).classList.remove('selected'); document.getElementById(`chk-${o.id}`).checked = false; }); updateSelectionUI(); }
+function selectAll()  {
+  filteredOrders.forEach(o => {
+    selected.add(o.id);
+    document.getElementById(`row-${o.id}`).classList.add('selected');
+    document.getElementById(`chk-${o.id}`).checked = true;
+  });
+  updateSelectionUI();
+}
+function selectNone() {
+  filteredOrders.forEach(o => {
+    selected.delete(o.id);
+    document.getElementById(`row-${o.id}`).classList.remove('selected');
+    document.getElementById(`chk-${o.id}`).checked = false;
+  });
+  updateSelectionUI();
+}
 function toggleSelectAll(checked) { checked ? selectAll() : selectNone(); }
 
 function updateSelectionUI() {
-  const sel = selected.size;
+  const sel       = selected.size;
   const fileCount = filteredOrders.filter(o => selected.has(o.id)).reduce((n, o) => n + o.lineItems.length, 0);
-  document.getElementById('selected-count').textContent = sel;
+  document.getElementById('selected-count').textContent  = sel;
   document.getElementById('file-count-badge').textContent = fileCount;
-  document.getElementById('download-btn').disabled = sel === 0;
-  document.getElementById('select-all').checked = sel > 0 && sel === filteredOrders.length;
+  document.getElementById('download-btn').disabled       = sel === 0;
+  document.getElementById('select-all').checked          = sel > 0 && sel === filteredOrders.length;
+}
+
+// ── PRESET MANAGEMENT ─────────────────────────────────────────────
+let presets        = [];
+let activePresetId = null;
+let editingPresetId = null; // null = creating new
+
+function loadPresetsFromStorage() {
+  try {
+    const saved = localStorage.getItem('pfd_presets');
+    if (saved) presets = JSON.parse(saved);
+  } catch(e) { presets = []; }
+}
+
+function savePresetsToStorage() {
+  localStorage.setItem('pfd_presets', JSON.stringify(presets));
+}
+
+function renderPresetSelect() {
+  const sel = document.getElementById('active-preset-select');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">None (original files)</option>';
+  presets.forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p.id;
+    opt.textContent = p.name;
+    sel.appendChild(opt);
+  });
+  if (activePresetId) sel.value = activePresetId;
+  updateEnhanceIndicator();
+}
+
+function setActivePreset(id) {
+  activePresetId = id || null;
+  document.getElementById('edit-preset-btn').disabled = !id;
+  document.getElementById('del-preset-btn').disabled  = !id;
+  updateEnhanceIndicator();
+}
+
+function updateEnhanceIndicator() {
+  const el = document.getElementById('enhance-indicator');
+  if (!activePresetId) {
+    el.textContent = 'No Enhancement';
+    el.className   = '';
+    el.id          = 'enhance-indicator';
+    return;
+  }
+  const p = presets.find(x => x.id === activePresetId);
+  el.textContent = p ? `Preset: ${p.name}` : 'No Enhancement';
+  el.className   = p ? 'active' : '';
+  el.id          = 'enhance-indicator';
+}
+
+function toggleEnhancePanel() {
+  const body = document.getElementById('enhance-body');
+  const icon = document.getElementById('enhance-toggle-icon');
+  const open = body.style.display !== 'none';
+  body.style.display = open ? 'none' : 'block';
+  icon.classList.toggle('open', !open);
+}
+
+// ── PRESET EDITOR ─────────────────────────────────────────────────
+const PARAMS = ['brightness', 'contrast', 'saturation', 'vibrance', 'sharpness'];
+
+function syncSlider(name) {
+  document.getElementById(`v-${name}`).textContent = document.getElementById(`s-${name}`).value;
+}
+
+function openPresetEditor(id) {
+  editingPresetId = id || null;
+  const editor = document.getElementById('preset-editor');
+  const title  = document.getElementById('editor-title');
+
+  // Expand panel if collapsed
+  const body = document.getElementById('enhance-body');
+  if (body.style.display === 'none') toggleEnhancePanel();
+
+  if (id) {
+    const p = presets.find(x => x.id === id);
+    if (!p) return;
+    title.textContent = 'Edit Preset';
+    document.getElementById('editor-name').value = p.name;
+    PARAMS.forEach(name => {
+      const val = p[name] ?? 0;
+      document.getElementById(`s-${name}`).value = val;
+      document.getElementById(`v-${name}`).textContent = val;
+    });
+  } else {
+    title.textContent = 'New Preset';
+    document.getElementById('editor-name').value = '';
+    PARAMS.forEach(name => {
+      document.getElementById(`s-${name}`).value = 0;
+      document.getElementById(`v-${name}`).textContent = 0;
+    });
+  }
+
+  editor.style.display = 'block';
+  document.getElementById('editor-name').focus();
+}
+
+function closePresetEditor() {
+  document.getElementById('preset-editor').style.display = 'none';
+  editingPresetId = null;
+}
+
+function savePreset() {
+  const name = document.getElementById('editor-name').value.trim();
+  if (!name) {
+    document.getElementById('editor-name').focus();
+    return;
+  }
+  const values = {};
+  PARAMS.forEach(n => { values[n] = parseInt(document.getElementById(`s-${n}`).value, 10); });
+
+  if (editingPresetId) {
+    const p = presets.find(x => x.id === editingPresetId);
+    if (p) { p.name = name; Object.assign(p, values); }
+  } else {
+    presets.push({ id: `p_${Date.now()}`, name, ...values });
+  }
+
+  savePresetsToStorage();
+  renderPresetSelect();
+  if (!editingPresetId) {
+    // Auto-select the new preset
+    const newId = presets[presets.length - 1].id;
+    document.getElementById('active-preset-select').value = newId;
+    setActivePreset(newId);
+  }
+  closePresetEditor();
+}
+
+function confirmDeletePreset() {
+  if (!activePresetId) return;
+  const p = presets.find(x => x.id === activePresetId);
+  if (!p) return;
+  if (!confirm(`Delete preset "${p.name}"?`)) return;
+  presets = presets.filter(x => x.id !== activePresetId);
+  savePresetsToStorage();
+  activePresetId = null;
+  document.getElementById('active-preset-select').value = '';
+  setActivePreset(null);
+  renderPresetSelect();
+  closePresetEditor();
+}
+
+// ── IMAGE PROCESSING ──────────────────────────────────────────────
+
+function applyBrightness(data, value) {
+  const v = value * 2.55;
+  for (let i = 0; i < data.length; i += 4) {
+    data[i]     = Math.max(0, Math.min(255, data[i]     + v));
+    data[i + 1] = Math.max(0, Math.min(255, data[i + 1] + v));
+    data[i + 2] = Math.max(0, Math.min(255, data[i + 2] + v));
+  }
+}
+
+function applyContrast(data, value) {
+  const factor = (259 * (value + 255)) / (255 * (259 - value));
+  for (let i = 0; i < data.length; i += 4) {
+    data[i]     = Math.max(0, Math.min(255, factor * (data[i]     - 128) + 128));
+    data[i + 1] = Math.max(0, Math.min(255, factor * (data[i + 1] - 128) + 128));
+    data[i + 2] = Math.max(0, Math.min(255, factor * (data[i + 2] - 128) + 128));
+  }
+}
+
+function applySaturation(data, value) {
+  const factor = 1 + value / 100;
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i], g = data[i + 1], b = data[i + 2];
+    const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+    data[i]     = Math.max(0, Math.min(255, gray + (r - gray) * factor));
+    data[i + 1] = Math.max(0, Math.min(255, gray + (g - gray) * factor));
+    data[i + 2] = Math.max(0, Math.min(255, gray + (b - gray) * factor));
+  }
+}
+
+function applyVibrance(data, value) {
+  const amount = value / 100;
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i], g = data[i + 1], b = data[i + 2];
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    const currentSat = (max - min) / 255;
+    const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+    // Less-saturated pixels receive a proportionally larger boost
+    const boost = amount * (1 - currentSat);
+    data[i]     = Math.max(0, Math.min(255, gray + (r - gray) * (1 + boost)));
+    data[i + 1] = Math.max(0, Math.min(255, gray + (g - gray) * (1 + boost)));
+    data[i + 2] = Math.max(0, Math.min(255, gray + (b - gray) * (1 + boost)));
+  }
+}
+
+function applySharpness(imageData, value) {
+  if (value === 0) return;
+  const { data, width, height } = imageData;
+  const strength = value / 100;
+  // Snapshot current pixel data before writing back
+  const src = new Uint8ClampedArray(data);
+  for (let y = 1; y < height - 1; y++) {
+    for (let x = 1; x < width - 1; x++) {
+      const i = (y * width + x) * 4;
+      for (let c = 0; c < 3; c++) {
+        const center = src[i + c];
+        const top    = src[((y - 1) * width + x) * 4 + c];
+        const bottom = src[((y + 1) * width + x) * 4 + c];
+        const left   = src[(y * width + (x - 1)) * 4 + c];
+        const right  = src[(y * width + (x + 1)) * 4 + c];
+        // Unsharp-mask: blend original with laplacian edge emphasis
+        data[i + c] = Math.max(0, Math.min(255,
+          center + strength * (4 * center - top - bottom - left - right)
+        ));
+      }
+    }
+  }
+}
+
+function blobToImage(blob) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(blob);
+    const img = new Image();
+    img.onload  = () => { URL.revokeObjectURL(url); resolve(img); };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Image load failed')); };
+    img.src = url;
+  });
+}
+
+async function processImageWithPreset(blob, preset) {
+  const img    = await blobToImage(blob);
+  const canvas = document.createElement('canvas');
+  canvas.width  = img.naturalWidth;
+  canvas.height = img.naturalHeight;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(img, 0, 0);
+
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const { data }  = imageData;
+
+  if (preset.brightness !== 0) applyBrightness(data, preset.brightness);
+  if (preset.contrast   !== 0) applyContrast(data, preset.contrast);
+  if (preset.saturation !== 0) applySaturation(data, preset.saturation);
+  if (preset.vibrance   !== 0) applyVibrance(data, preset.vibrance);
+  if (preset.sharpness  !== 0) applySharpness(imageData, preset.sharpness);
+
+  ctx.putImageData(imageData, 0, 0);
+
+  const mimeType = blob.type === 'image/png' ? 'image/png' : 'image/jpeg';
+  const quality  = mimeType === 'image/jpeg' ? 0.95 : undefined;
+
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(b => b ? resolve(b) : reject(new Error('toBlob failed')), mimeType, quality);
+  });
 }
 
 // ── DOWNLOAD ──────────────────────────────────────────────────────
@@ -799,21 +1360,17 @@ async function downloadSelected() {
   const toDownload = filteredOrders.filter(o => selected.has(o.id));
   if (toDownload.length === 0) return;
 
-  // Build flat file list with final filenames
+  const preset = activePresetId ? presets.find(p => p.id === activePresetId) : null;
+
   const fileList = [];
   for (const o of toDownload) {
     const multi = o.lineItems.length > 1;
     o.lineItems.forEach((li, idx) => {
-      const suffix = li.suffix;
-      
-      // Determine the extension dynamically from the file URL
-      let ext = 'jpg';
+      const suffix   = li.suffix;
+      let ext        = 'jpg';
       const extMatch = li.fileUrl.match(/\.([a-zA-Z0-9]+)(?:[\?#].*)?$/);
-      if (extMatch) {
-          ext = extMatch[1].toLowerCase();
-      }
-
-      const name   = multi
+      if (extMatch) ext = extMatch[1].toLowerCase();
+      const name = multi
         ? `${o.number}-${suffix}-${idx + 1}.${ext}`
         : `${o.number}-${suffix}.${ext}`;
       fileList.push({ name, url: li.fileUrl, order: o.number });
@@ -825,11 +1382,16 @@ async function downloadSelected() {
 
   document.getElementById('progress-wrap').style.display = 'block';
   document.getElementById('progress-log').innerHTML = '';
+  document.getElementById('progress-label').textContent = preset ? `Processing (${preset.name})` : 'Downloading';
   setProgress(0, total);
-  logLine(`Starting download of ${total} file${total !== 1 ? 's' : ''} from ${toDownload.length} orders…`, 'info');
+
+  const startMsg = preset
+    ? `Starting download of ${total} file${total !== 1 ? 's' : ''} with preset "${preset.name}" applied…`
+    : `Starting download of ${total} file${total !== 1 ? 's' : ''} from ${toDownload.length} orders…`;
+  logLine(startMsg, 'info');
 
   const btn = document.getElementById('download-btn');
-  btn.disabled = true;
+  btn.disabled    = true;
   btn.textContent = 'Packaging…';
 
   const zip = new JSZip();
@@ -838,11 +1400,12 @@ async function downloadSelected() {
     try {
       const res = await fetch(f.url);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const blob = await res.blob();
-      zip.file(f.name, blob);
+      const rawBlob   = await res.blob();
+      const finalBlob = preset ? await processImageWithPreset(rawBlob, preset) : rawBlob;
+      zip.file(f.name, finalBlob);
       done++;
       setProgress(done + failed, total);
-      logLine(`✓ ${f.name}`, 'ok');
+      logLine(`✓ ${f.name}${preset ? ' (enhanced)' : ''}`, 'ok');
     } catch (e) {
       failed++;
       setProgress(done + failed, total);
@@ -854,11 +1417,11 @@ async function downloadSelected() {
 
   try {
     const zipBlob = await zip.generateAsync({ type: 'blob', compression: 'STORE' });
-    const dateStr = new Date().toISOString().slice(0,10);
+    const dateStr = new Date().toISOString().slice(0, 10);
     const zipName = `print-files-${dateStr}.zip`;
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(zipBlob);
-    a.download = zipName;
+    const a       = document.createElement('a');
+    a.href        = URL.createObjectURL(zipBlob);
+    a.download    = zipName;
     a.click();
     URL.revokeObjectURL(a.href);
     logLine(`Done — ${zipName} downloaded (${done} ok, ${failed} failed)`, 'ok');
@@ -866,6 +1429,7 @@ async function downloadSelected() {
     logLine(`ZIP generation failed: ${e.message}`, 'fail');
   }
 
+  document.getElementById('progress-label').textContent = 'Downloading';
   btn.disabled = false;
   btn.innerHTML = `<svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 1v8M3 6l3.5 3.5L10 6M1 11h11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Download ZIP`;
 }
