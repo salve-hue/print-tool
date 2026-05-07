@@ -243,7 +243,7 @@
 
   .table-head {
     display: grid;
-    grid-template-columns: 36px 150px 100px 120px 1fr 60px;
+    grid-template-columns: 36px 150px 100px 120px 1fr 60px 96px;
     padding: 10px 16px;
     border-bottom: 1px solid var(--border);
     background: var(--bg);
@@ -261,7 +261,7 @@
 
   .order-row {
     display: grid;
-    grid-template-columns: 36px 150px 100px 120px 1fr 60px;
+    grid-template-columns: 36px 150px 100px 120px 1fr 60px 96px;
     padding: 10px 16px;
     border-bottom: 1px solid var(--border);
     gap: 12px;
@@ -598,6 +598,59 @@
     color: var(--text-dim);
     margin-top: 2px;
   }
+
+  /* ── PER-ROW ENHANCE BUTTON ── */
+  .enhance-btn {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 5px 8px;
+    cursor: pointer;
+    background: transparent;
+    color: var(--text-dim);
+    width: 100%;
+    transition: border-color 0.15s, color 0.15s, background 0.15s;
+    white-space: nowrap;
+  }
+  .enhance-btn:not(:disabled):hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(88,166,255,0.08);
+  }
+  .enhance-btn.active {
+    border-color: rgba(63,185,80,0.5);
+    color: var(--green);
+    background: rgba(63,185,80,0.1);
+  }
+  .enhance-btn.active:hover {
+    border-color: rgba(248,81,73,0.5);
+    color: var(--red);
+    background: rgba(248,81,73,0.08);
+  }
+  .enhance-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+  /* ── THUMBNAIL HOVER PREVIEW ── */
+  #thumb-hover {
+    position: fixed;
+    z-index: 9999;
+    display: none;
+    pointer-events: none;
+    background: var(--surface);
+    border: 1px solid var(--border-hi);
+    border-radius: 6px;
+    padding: 6px;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.75);
+  }
+  #thumb-hover img {
+    width: 300px;
+    height: auto;
+    display: block;
+    border-radius: 3px;
+  }
 </style>
 </head>
 <body>
@@ -765,6 +818,7 @@
         <span>Date</span>
         <span>Files</span>
         <span style="text-align:center;">Count</span>
+        <span style="text-align:center;">Apply</span>
       </div>
       <div id="order-list">
         <div class="empty-state">
@@ -800,6 +854,7 @@ const PROXY_URL = 'https://shopify-proxy.salve.workers.dev';
 let orders = [];
 let filteredOrders = [];
 let selected = new Set();
+let enhancedOrders = new Set(); // order IDs marked for enhancement
 
 // ── CREDENTIALS ───────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
@@ -810,6 +865,7 @@ window.addEventListener('DOMContentLoaded', () => {
   if (d && t) setStatus('Saved credentials loaded. Click Load to fetch orders.', 'info');
   loadPresetsFromStorage();
   renderPresetSelect();
+  setupHoverPreview();
 });
 
 function saveCredentials() {
@@ -987,6 +1043,11 @@ function renderOrders() {
       </div>
     `).join('');
 
+    const hasPreset  = !!activePresetId;
+    const isEnhanced = enhancedOrders.has(o.id);
+    const enhClass   = (hasPreset && isEnhanced) ? 'enhance-btn active' : 'enhance-btn';
+    const enhLabel   = !hasPreset ? '· No Preset' : (isEnhanced ? '✓ Enhanced' : 'Enhance');
+
     return `
       <div class="order-row" id="row-${o.id}" onclick="toggleRow(${o.id})">
         <input type="checkbox" id="chk-${o.id}" onclick="event.stopPropagation(); toggleRow(${o.id})">
@@ -997,6 +1058,10 @@ function renderOrders() {
         <div class="order-date">${fmt(o.date)}</div>
         <div class="order-files">${chipsHtml}</div>
         <div class="file-count">${o.lineItems.length}</div>
+        <div onclick="event.stopPropagation();">
+          <button class="${enhClass}" id="enhance-btn-${o.id}"
+            onclick="toggleEnhance(${o.id})" ${hasPreset ? '' : 'disabled'}>${enhLabel}</button>
+        </div>
       </div>
     `;
   }).join('');
@@ -1029,7 +1094,7 @@ async function loadThumbnail(placeholder) {
     const objUrl = URL.createObjectURL(blob);
     const img    = document.createElement('img');
     img.alt      = `Order #${order.number}`;
-    img.onload   = () => URL.revokeObjectURL(objUrl);
+    // Keep objUrl alive (not revoked) so the hover preview can reuse img.src
     img.onerror  = () => {
       URL.revokeObjectURL(objUrl);
       placeholder.textContent = 'Error';
@@ -1086,6 +1151,85 @@ function updateSelectionUI() {
   document.getElementById('select-all').checked          = sel > 0 && sel === filteredOrders.length;
 }
 
+// ── PER-ORDER ENHANCE TOGGLE ─────────────────────────────────────
+function toggleEnhance(id) {
+  if (!activePresetId) return;
+  if (enhancedOrders.has(id)) {
+    enhancedOrders.delete(id);
+  } else {
+    enhancedOrders.add(id);
+  }
+  const isEnhanced = enhancedOrders.has(id);
+  const btn = document.getElementById(`enhance-btn-${id}`);
+  if (btn) {
+    btn.className   = isEnhanced ? 'enhance-btn active' : 'enhance-btn';
+    btn.textContent = isEnhanced ? '✓ Enhanced' : 'Enhance';
+  }
+  updateEnhanceIndicator();
+}
+
+function updateEnhanceButtons() {
+  filteredOrders.forEach(o => {
+    const btn = document.getElementById(`enhance-btn-${o.id}`);
+    if (!btn) return;
+    if (!activePresetId) {
+      btn.disabled    = true;
+      btn.className   = 'enhance-btn';
+      btn.textContent = '· No Preset';
+    } else {
+      btn.disabled    = false;
+      const isEnhanced = enhancedOrders.has(o.id);
+      btn.className   = isEnhanced ? 'enhance-btn active' : 'enhance-btn';
+      btn.textContent = isEnhanced ? '✓ Enhanced' : 'Enhance';
+    }
+  });
+  updateEnhanceIndicator();
+}
+
+// ── THUMBNAIL HOVER PREVIEW ──────────────────────────────────────
+function setupHoverPreview() {
+  const hoverEl = document.createElement('div');
+  hoverEl.id = 'thumb-hover';
+  document.body.appendChild(hoverEl);
+
+  let activeCell = null;
+
+  document.getElementById('order-list').addEventListener('mouseover', e => {
+    const cell = e.target.closest('.thumb-cell');
+    if (!cell || cell === activeCell) return;
+    activeCell = cell;
+    const img = cell.querySelector('img');
+    if (!img) { hoverEl.style.display = 'none'; return; }
+    hoverEl.innerHTML = '';
+    const big = document.createElement('img');
+    big.src = img.src;
+    hoverEl.appendChild(big);
+    hoverEl.style.display = 'block';
+  });
+
+  document.addEventListener('mousemove', e => {
+    if (hoverEl.style.display === 'none') return;
+    const PW = 318; // preview width + padding
+    const x  = e.clientX + 20;
+    const y  = e.clientY - 40;
+    const ph = hoverEl.offsetHeight || 220;
+    hoverEl.style.left = (x + PW > window.innerWidth ? e.clientX - PW - 10 : x) + 'px';
+    hoverEl.style.top  = Math.max(8, Math.min(y, window.innerHeight - ph - 8)) + 'px';
+  });
+
+  document.getElementById('order-list').addEventListener('mouseout', e => {
+    if (!e.relatedTarget || !e.relatedTarget.closest('.thumb-cell')) {
+      hoverEl.style.display = 'none';
+      activeCell = null;
+    }
+  });
+
+  document.getElementById('order-list').addEventListener('mouseleave', () => {
+    hoverEl.style.display = 'none';
+    activeCell = null;
+  });
+}
+
 // ── PRESET MANAGEMENT ─────────────────────────────────────────────
 let presets        = [];
 let activePresetId = null;
@@ -1120,7 +1264,7 @@ function setActivePreset(id) {
   activePresetId = id || null;
   document.getElementById('edit-preset-btn').disabled = !id;
   document.getElementById('del-preset-btn').disabled  = !id;
-  updateEnhanceIndicator();
+  updateEnhanceButtons();
 }
 
 function updateEnhanceIndicator() {
@@ -1131,10 +1275,13 @@ function updateEnhanceIndicator() {
     el.id          = 'enhance-indicator';
     return;
   }
-  const p = presets.find(x => x.id === activePresetId);
-  el.textContent = p ? `Preset: ${p.name}` : 'No Enhancement';
-  el.className   = p ? 'active' : '';
-  el.id          = 'enhance-indicator';
+  const p          = presets.find(x => x.id === activePresetId);
+  const markedCount = filteredOrders.filter(o => enhancedOrders.has(o.id)).length;
+  el.textContent   = p
+    ? (markedCount > 0 ? `${p.name} · ${markedCount} marked` : `Preset: ${p.name}`)
+    : 'No Enhancement';
+  el.className     = markedCount > 0 ? 'active' : '';
+  el.id            = 'enhance-indicator';
 }
 
 function toggleEnhancePanel() {
@@ -1373,20 +1520,21 @@ async function downloadSelected() {
       const name = multi
         ? `${o.number}-${suffix}-${idx + 1}.${ext}`
         : `${o.number}-${suffix}.${ext}`;
-      fileList.push({ name, url: li.fileUrl, order: o.number });
+      fileList.push({ name, url: li.fileUrl, order: o.number, orderId: o.id });
     });
   }
 
+  const markedCount = preset ? toDownload.filter(o => enhancedOrders.has(o.id)).length : 0;
   const total = fileList.length;
   let done = 0, failed = 0;
 
   document.getElementById('progress-wrap').style.display = 'block';
   document.getElementById('progress-log').innerHTML = '';
-  document.getElementById('progress-label').textContent = preset ? `Processing (${preset.name})` : 'Downloading';
+  document.getElementById('progress-label').textContent = markedCount > 0 ? `Processing (${preset.name})` : 'Downloading';
   setProgress(0, total);
 
-  const startMsg = preset
-    ? `Starting download of ${total} file${total !== 1 ? 's' : ''} with preset "${preset.name}" applied…`
+  const startMsg = markedCount > 0
+    ? `Starting download — ${markedCount} order${markedCount !== 1 ? 's' : ''} will use preset "${preset.name}"…`
     : `Starting download of ${total} file${total !== 1 ? 's' : ''} from ${toDownload.length} orders…`;
   logLine(startMsg, 'info');
 
@@ -1400,12 +1548,13 @@ async function downloadSelected() {
     try {
       const res = await fetch(f.url);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const rawBlob   = await res.blob();
-      const finalBlob = preset ? await processImageWithPreset(rawBlob, preset) : rawBlob;
+      const rawBlob      = await res.blob();
+      const shouldEnhance = preset && enhancedOrders.has(f.orderId);
+      const finalBlob    = shouldEnhance ? await processImageWithPreset(rawBlob, preset) : rawBlob;
       zip.file(f.name, finalBlob);
       done++;
       setProgress(done + failed, total);
-      logLine(`✓ ${f.name}${preset ? ' (enhanced)' : ''}`, 'ok');
+      logLine(`✓ ${f.name}${shouldEnhance ? ' (enhanced)' : ''}`, 'ok');
     } catch (e) {
       failed++;
       setProgress(done + failed, total);
