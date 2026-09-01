@@ -949,20 +949,20 @@ async function loadOrders() {
     const lineItems = [];
     for (const li of (o.line_items || [])) {
       const props = li.properties || [];
-      let fileUrl = (props.find(p => p.name === '_Print_File_URL') || {}).value;
-      if (!fileUrl) {
-        for (const p of props) {
-          if (typeof p.value === 'string') {
-            const match = p.value.match(/(https:\/\/files\.playmatstudio\.com\/[^"\s<>]+)/i);
-            if (match) {
-              fileUrl = match[1].replace(/[.,;!?)\]'"]+$/, '');
-              break;
-            }
-          }
+
+      // Collect ALL unique playmatstudio URLs from every property on this line item.
+      // Multiple URLs on the same line item = double-sided product.
+      const fileUrls = [];
+      for (const p of props) {
+        if (typeof p.value !== 'string') continue;
+        const hits = [...p.value.matchAll(/(https:\/\/files\.playmatstudio\.com\/[^"\s<>]+)/gi)];
+        for (const m of hits) {
+          const url = m[1].replace(/[.,;!?)\]'"]+$/, '').replace(/["']$/, '');
+          if (!fileUrls.includes(url)) fileUrls.push(url);
         }
       }
-      if (!fileUrl) continue;
-      fileUrl = fileUrl.replace(/["']$/, '');
+
+      if (fileUrls.length === 0) continue;
 
       const suffix = deriveSuffix(li.variant_title || li.title || '', [
         li.variant_title,
@@ -971,7 +971,12 @@ async function loadOrders() {
         (li.properties || []).find(p => p.name === 'Finish')?.value,
       ]);
 
-      lineItems.push({ fileUrl, suffix, variantTitle: li.variant_title || li.title || '' });
+      const variantTitle = li.variant_title || li.title || '';
+      const isDbl = fileUrls.length > 1;
+
+      fileUrls.forEach((fileUrl, urlIdx) => {
+        lineItems.push({ fileUrl, suffix, variantTitle, isDbl, dblIdx: urlIdx + 1 });
+      });
     }
     if (lineItems.length === 0) continue;
     orders.push({ id: o.id, number: displayOrderNumber, date: new Date(o.created_at), lineItems });
@@ -1039,6 +1044,7 @@ function renderOrders() {
     const chipsHtml = o.lineItems.map(li => `
       <div class="file-chip" title="${li.variantTitle}">
         <span class="suffix ${li.suffix}">${li.suffix}</span>
+        ${li.isDbl ? `<span class="suffix" style="background:rgba(63,185,80,0.15);color:#3fb950;">DBL${li.dblIdx}</span>` : ''}
         ${li.variantTitle || 'Print File'}
       </div>
     `).join('');
@@ -1511,15 +1517,26 @@ async function downloadSelected() {
 
   const fileList = [];
   for (const o of toDownload) {
-    const multi = o.lineItems.length > 1;
-    o.lineItems.forEach((li, idx) => {
-      const suffix   = li.suffix;
-      let ext        = 'jpg';
+    // Single-sided files only get a -N counter when there are multiple of them
+    const singleFiles   = o.lineItems.filter(li => !li.isDbl);
+    const needsSingleIdx = singleFiles.length > 1;
+    let singleCounter   = 0;
+
+    o.lineItems.forEach(li => {
+      let ext = 'jpg';
       const extMatch = li.fileUrl.match(/\.([a-zA-Z0-9]+)(?:[\?#].*)?$/);
       if (extMatch) ext = extMatch[1].toLowerCase();
-      const name = multi
-        ? `${o.number}-${suffix}-${idx + 1}.${ext}`
-        : `${o.number}-${suffix}.${ext}`;
+
+      let name;
+      if (li.isDbl) {
+        // Two URLs from the same line item → double-sided product
+        name = `${o.number}-${li.suffix}-DBL${li.dblIdx}.${ext}`;
+      } else {
+        singleCounter++;
+        name = needsSingleIdx
+          ? `${o.number}-${li.suffix}-${singleCounter}.${ext}`
+          : `${o.number}-${li.suffix}.${ext}`;
+      }
       fileList.push({ name, url: li.fileUrl, order: o.number, orderId: o.id });
     });
   }
