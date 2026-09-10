@@ -359,6 +359,8 @@
   .suffix.BLK { background: rgba(139,148,158,0.2); color: var(--text-sec); }
   .suffix.UNS { background: rgba(210,153,34,0.2);  color: var(--orange); }
   .suffix.REF { background: rgba(163,113,247,0.2); color: #a371f7; }
+  .suffix.EXT { background: rgba(63,185,80,0.15);  color: #3fb950; }
+  .suffix.EXP { background: rgba(248,166,0,0.18);  color: #f8a600; }
   .suffix.UNK { background: rgba(255,255,255,0.1); color: var(--text-dim); }
 
   .file-count {
@@ -897,6 +899,8 @@ function setStatus(msg, type) {
 // ── VARIANT → SUFFIX ──────────────────────────────────────────────
 function deriveSuffix(variantTitle, options) {
   const haystack = [variantTitle, ...(options || [])].join(' ').toLowerCase();
+  if (/28\s*x\s*16/.test(haystack))                      return 'EXP';
+  if (/28\s*x\s*14/.test(haystack))                      return 'EXT';
   if (/\bref\b|reflective/.test(haystack))               return 'REF';
   if (/\bclr\b|clear|stitched clear/.test(haystack))     return 'CLR';
   if (/\bblk\b|black|stitched black/.test(haystack))     return 'BLK';
