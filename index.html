@@ -978,7 +978,8 @@ async function loadOrders() {
       ]);
 
       const variantTitle = li.variant_title || li.title || '';
-      const isDbl = fileUrls.length > 1;
+      const dblHaystack = [variantTitle, ...(li.properties || []).map(p => String(p.value || ''))].join(' ').toLowerCase();
+      const isDbl = fileUrls.length > 1 && /\bdbl\b|double[- ]?sided|double/i.test(dblHaystack);
 
       fileUrls.forEach((fileUrl, urlIdx) => {
         lineItems.push({ fileUrl, suffix, variantTitle, isDbl, dblIdx: urlIdx + 1 });
@@ -1404,7 +1405,7 @@ function applyContrast(data, value) {
   const factor = (259 * (value + 255)) / (255 * (259 - value));
   for (let i = 0; i < data.length; i += 4) {
     data[i]     = Math.max(0, Math.min(255, factor * (data[i]     - 128) + 128));
-    data[i + 1] = Math.max(0, Math.min(255, factor * (data[i + 1] - 128) + 128));
+    data[i[i + 1] = Math.max(0, Math.min(255, factor * (data[i + 1] - 128) + 128));
     data[i + 2] = Math.max(0, Math.min(255, factor * (data[i + 2] - 128) + 128));
   }
 }
