@@ -899,8 +899,8 @@ function setStatus(msg, type) {
 // ── VARIANT → SUFFIX ──────────────────────────────────────────────
 function deriveSuffix(variantTitle, options) {
   const haystack = [variantTitle, ...(options || [])].join(' ').toLowerCase();
-  if (/28\s*x\s*16/.test(haystack))                      return 'EXP';
-  if (/28\s*x\s*14/.test(haystack))                      return 'EXT';
+  if (/28["”]?\s*x\s*16/.test(haystack))            return 'EXP';
+  if (/28["”]?\s*x\s*14/.test(haystack))            return 'EXT';
   if (/\bref\b|reflective/.test(haystack))               return 'REF';
   if (/\bclr\b|clear|stitched clear/.test(haystack))     return 'CLR';
   if (/\bblk\b|black|stitched black/.test(haystack))     return 'BLK';
@@ -956,11 +956,11 @@ async function loadOrders() {
     for (const li of (o.line_items || [])) {
       const props = li.properties || [];
 
-      // Collect ALL unique playmatstudio URLs from every property on this line item.
-      // Multiple URLs on the same line item = double-sided product.
+      // Collect ALL unique playmatstudio URLs from print file properties only (skip thumbnails).
       const fileUrls = [];
       for (const p of props) {
         if (typeof p.value !== 'string') continue;
+        if ((p.name || '').toLowerCase().includes('thumb')) continue;
         const hits = [...p.value.matchAll(/(https:\/\/files\.playmatstudio\.com\/[^"\s<>]+)/gi)];
         for (const m of hits) {
           const url = m[1].replace(/[.,;!?)\]'"]+$/, '').replace(/["']$/, '');
