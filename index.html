@@ -920,13 +920,25 @@ async function loadOrders() {
   let pageInfo  = null;
   let hasMore   = true;
 
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+
   try {
     while (hasMore) {
       const query    = pageInfo ? `limit=250&page_info=${pageInfo}` : `status=unfulfilled&limit=250&fields=id,order_number,name,created_at,fulfillment_status,line_items`;
       const proxyUrl = `${PROXY_URL}?shop=${encodeURIComponent(d)}&query=${encodeURIComponent(query)}`;
-      const res = await fetch(proxyUrl, {
-        headers: { 'X-Shopify-Token': t, 'Content-Type': 'application/json' }
-      });
+
+      let res;
+      let backoff = 1000;
+      for (let attempt = 0; attempt < 5; attempt++) {
+        res = await fetch(proxyUrl, {
+          headers: { 'X-Shopify-Token': t, 'Content-Type': 'application/json' }
+        });
+        if (res.status !== 429) break;
+        setStatus(`Rate limited — retrying in ${backoff / 1000}s…`, 'info');
+        await sleep(backoff);
+        backoff *= 2;
+      }
+
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         const errMsg = typeof err.errors === 'string' ? err.errors : JSON.stringify(err.errors || err);
@@ -936,7 +948,7 @@ async function loadOrders() {
       allOrders = allOrders.concat(data.orders || []);
       const link = res.headers.get('X-Link') || '';
       const next = link.match(/page_info=([^&>]+)[^>]*>;\s*rel="next"/);
-      if (next) { pageInfo = next[1]; } else { hasMore = false; }
+      if (next) { pageInfo = next[1]; await sleep(550); } else { hasMore = false; }
     }
   } catch (e) {
     setStatus(`Error: ${e.message}`, 'error');
