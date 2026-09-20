@@ -968,12 +968,12 @@ async function loadOrders() {
     for (const li of (o.line_items || [])) {
       const props = li.properties || [];
 
-      // Collect ALL unique playmatstudio URLs from print file properties only (skip thumbnails).
+      // Collect ALL unique print file URLs (skip thumbnails).
       const fileUrls = [];
       for (const p of props) {
         if (typeof p.value !== 'string') continue;
         if ((p.name || '').toLowerCase().includes('thumb')) continue;
-        const hits = [...p.value.matchAll(/(https:\/\/files\.playmatstudio\.com\/[^"\s<>]+)/gi)];
+        const hits = [...p.value.matchAll(/(https:\/\/(?:files\.playmatstudio\.com|pub-[a-f0-9]+\.r2\.dev)\/[^"\s<>]+)/gi)];
         for (const m of hits) {
           const url = m[1].replace(/[.,;!?)\]'"]+$/, '').replace(/["']$/, '');
           if (!fileUrls.includes(url)) fileUrls.push(url);
