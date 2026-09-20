@@ -1,1 +1,1630 @@
-{file_content}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#161b22">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Print File Downloader</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
+
+  :root {
+    --bg:        #0d1117;
+    --surface:   #161b22;
+    --border:    #30363d;
+    --border-hi: #58a6ff;
+    --text:      #e6edf3;
+    --text-sec:  #8b949e;
+    --text-dim:  #484f58;
+    --accent:    #58a6ff;
+    --green:     #3fb950;
+    --red:       #f85149;
+    --orange:    #d29922;
+    --mono:      'IBM Plex Mono', monospace;
+    --sans:      'IBM Plex Sans', sans-serif;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── HEADER ── */
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 18px 32px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: var(--surface);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .logo-mark {
+    width: 36px; height: 36px;
+    background: var(--accent);
+    display: grid;
+    place-items: center;
+    border-radius: 4px;
+    flex-shrink: 0;
+  }
+  .logo-mark svg { width: 20px; height: 20px; }
+
+  header h1 {
+    font-family: var(--mono);
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text);
+  }
+  header .sub {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-sec);
+    letter-spacing: 0.04em;
+    margin-left: auto;
+  }
+
+  /* ── MAIN LAYOUT ── */
+  main {
+    flex: 1;
+    padding: 32px;
+    max-width: 1100px;
+    width: 100%;
+    margin: 0 auto;
+  }
+
+  /* ── SETUP PANEL ── */
+  #setup-panel {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
+    overflow: hidden;
+  }
+
+  .panel-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .panel-header h2 {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-sec);
+  }
+  .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--text-dim);
+  }
+  .dot.green  { background: var(--green); }
+  .dot.orange { background: var(--orange); }
+
+  .panel-body { padding: 20px; }
+
+  .field-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin-bottom: 14px;
+  }
+
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field label {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-sec);
+  }
+  .field input {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 9px 12px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .field input:focus { border-color: var(--accent); }
+  .field input::placeholder { color: var(--text-dim); }
+
+  .field-hint {
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-top: 2px;
+  }
+
+  /* ── BUTTONS ── */
+  .btn {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    border: none;
+    border-radius: 5px;
+    padding: 10px 18px;
+    cursor: pointer;
+    transition: opacity 0.15s, transform 0.1s;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .btn:hover { opacity: 0.85; }
+  .btn:active { transform: scale(0.98); }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+  .btn-primary   { background: var(--accent); color: #0d1117; }
+  .btn-success   { background: var(--green);  color: #0d1117; }
+  .btn-danger    { background: var(--red);    color: #fff; }
+  .btn-ghost     { background: rgba(255,255,255,0.07); color: var(--text); }
+
+  /* ── STATUS BAR ── */
+  #status-bar {
+    display: none;
+    margin-top: 14px;
+    padding: 10px 14px;
+    border-radius: 5px;
+    font-family: var(--mono);
+    font-size: 12px;
+    border: 1px solid transparent;
+  }
+  #status-bar.info  { background: rgba(88,166,255,0.1); border-color: rgba(88,166,255,0.3); color: var(--accent); }
+  #status-bar.error { background: rgba(248,81,73,0.1);  border-color: rgba(248,81,73,0.3);  color: var(--red); }
+  #status-bar.ok    { background: rgba(63,185,80,0.1);  border-color: rgba(63,185,80,0.3);  color: var(--green); }
+
+  /* ── ORDERS PANEL ── */
+  #orders-panel { display: none; margin-top: 24px; }
+
+  .toolbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+  }
+  .toolbar-left  { display: flex; align-items: center; gap: 10px; flex: 1; flex-wrap: wrap; }
+  .toolbar-right { display: flex; align-items: center; gap: 10px; }
+
+  .count-badge {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-sec);
+    padding: 4px 8px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+  }
+  .count-badge span { color: var(--accent); font-weight: 600; }
+
+  /* ── ENHANCE INDICATOR (toolbar badge) ── */
+  #enhance-indicator {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-dim);
+    padding: 4px 8px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    transition: all 0.2s;
+  }
+  #enhance-indicator.active {
+    color: var(--green);
+    border-color: rgba(63,185,80,0.4);
+    background: rgba(63,185,80,0.07);
+  }
+
+  /* ── ORDER TABLE ── */
+  .order-table {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--surface);
+  }
+
+  .table-head {
+    display: grid;
+    grid-template-columns: 36px 150px 100px 120px 1fr 60px 96px;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+    gap: 12px;
+    align-items: center;
+  }
+  .table-head span {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-dim);
+  }
+
+  .order-row {
+    display: grid;
+    grid-template-columns: 36px 150px 100px 120px 1fr 60px 96px;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    gap: 12px;
+    align-items: center;
+    transition: background 0.1s;
+    cursor: pointer;
+  }
+  .order-row:last-child { border-bottom: none; }
+  .order-row:hover { background: rgba(255,255,255,0.03); }
+  .order-row.selected { background: rgba(88,166,255,0.06); }
+
+  .order-row input[type="checkbox"] {
+    width: 16px; height: 16px;
+    accent-color: var(--accent);
+    cursor: pointer;
+  }
+
+  /* ── THUMBNAIL CELL ── */
+  .thumb-cell {
+    width: 100%;
+    height: 80px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--bg);
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    position: relative;
+  }
+  .thumb-cell img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+  }
+  .thumb-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .thumb-placeholder.loading { color: var(--accent); }
+  .thumb-placeholder.error   { color: var(--red); }
+
+  .order-num {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--accent);
+  }
+
+  .order-date {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-sec);
+  }
+
+  .order-files {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .file-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 3px;
+    background: rgba(255,255,255,0.06);
+    color: var(--text-sec);
+    width: fit-content;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .file-chip .suffix {
+    font-weight: 600;
+    padding: 1px 5px;
+    border-radius: 2px;
+    font-size: 10px;
+  }
+  .suffix.CLR { background: rgba(88,166,255,0.2);  color: var(--accent); }
+  .suffix.BLK { background: rgba(139,148,158,0.2); color: var(--text-sec); }
+  .suffix.UNS { background: rgba(210,153,34,0.2);  color: var(--orange); }
+  .suffix.REF { background: rgba(163,113,247,0.2); color: #a371f7; }
+  .suffix.EXT { background: rgba(63,185,80,0.15);  color: #3fb950; }
+  .suffix.EXP { background: rgba(248,166,0,0.18);  color: #f8a600; }
+  .suffix.UNK { background: rgba(255,255,255,0.1); color: var(--text-dim); }
+
+  .file-count {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-dim);
+    text-align: center;
+  }
+
+  /* ── PROGRESS ── */
+  #progress-wrap {
+    display: none;
+    margin-top: 16px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
+    overflow: hidden;
+  }
+
+  .progress-header {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .progress-header span {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-sec);
+  }
+  #progress-pct {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--accent);
+  }
+
+  .progress-track {
+    height: 3px;
+    background: var(--border);
+  }
+  #progress-bar {
+    height: 100%;
+    background: var(--accent);
+    width: 0%;
+    transition: width 0.3s ease;
+  }
+
+  #progress-log {
+    padding: 14px 18px;
+    max-height: 160px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .log-line {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-sec);
+    display: flex;
+    gap: 10px;
+  }
+  .log-line .ts { color: var(--text-dim); flex-shrink: 0; }
+  .log-line.ok   .msg { color: var(--green); }
+  .log-line.fail .msg { color: var(--red); }
+  .log-line.info .msg { color: var(--accent); }
+
+  /* ── EMPTY STATE ── */
+  .empty-state {
+    padding: 48px;
+    text-align: center;
+    color: var(--text-dim);
+  }
+  .empty-state p {
+    font-family: var(--mono);
+    font-size: 13px;
+    margin-top: 12px;
+  }
+
+  /* ── FOOTER ── */
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 14px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  footer span {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 0.06em;
+  }
+
+  /* ── SELECT ALL ── */
+  #select-all {
+    width: 16px; height: 16px;
+    accent-color: var(--accent);
+    cursor: pointer;
+  }
+
+  /* ── ENHANCEMENT PANEL ── */
+  #enhance-panel {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
+    overflow: hidden;
+    margin-bottom: 16px;
+  }
+  #enhance-panel .panel-header {
+    cursor: pointer;
+    user-select: none;
+  }
+  #enhance-panel .panel-header:hover { background: rgba(255,255,255,0.02); }
+  #enhance-toggle-icon {
+    margin-left: auto;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-dim);
+    transition: transform 0.2s;
+  }
+  #enhance-toggle-icon.open { transform: rotate(180deg); }
+
+  #enhance-body { padding: 16px 20px; }
+
+  .preset-controls {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .preset-controls label {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-sec);
+    white-space: nowrap;
+  }
+
+  select.preset-select {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 7px 10px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 12px;
+    outline: none;
+    cursor: pointer;
+    min-width: 160px;
+  }
+  select.preset-select:focus { border-color: var(--accent); }
+
+  /* ── PRESET EDITOR ── */
+  #preset-editor {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+  }
+  .editor-heading {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-sec);
+    margin-bottom: 14px;
+  }
+  .sliders-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px 32px;
+    margin: 14px 0 18px;
+  }
+  .slider-group { display: flex; flex-direction: column; gap: 8px; }
+  .slider-label {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+  .slider-label .sname {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-sec);
+  }
+  .slider-label .sval {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--accent);
+    min-width: 28px;
+    text-align: right;
+  }
+  input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    border: 2px solid var(--bg);
+    box-shadow: 0 0 0 1px var(--accent);
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    border: 2px solid var(--bg);
+    box-shadow: 0 0 0 1px var(--accent);
+  }
+  .slider-range-hint {
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--text-dim);
+    margin-top: 2px;
+  }
+
+  /* ── PER-ROW ENHANCE BUTTON ── */
+  .enhance-btn {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 5px 8px;
+    cursor: pointer;
+    background: transparent;
+    color: var(--text-dim);
+    width: 100%;
+    transition: border-color 0.15s, color 0.15s, background 0.15s;
+    white-space: nowrap;
+  }
+  .enhance-btn:not(:disabled):hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(88,166,255,0.08);
+  }
+  .enhance-btn.active {
+    border-color: rgba(63,185,80,0.5);
+    color: var(--green);
+    background: rgba(63,185,80,0.1);
+  }
+  .enhance-btn.active:hover {
+    border-color: rgba(248,81,73,0.5);
+    color: var(--red);
+    background: rgba(248,81,73,0.08);
+  }
+  .enhance-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+  /* ── THUMBNAIL HOVER PREVIEW ── */
+  #thumb-hover {
+    position: fixed;
+    z-index: 9999;
+    display: none;
+    pointer-events: none;
+    background: var(--surface);
+    border: 1px solid var(--border-hi);
+    border-radius: 6px;
+    padding: 6px;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.75);
+  }
+  #thumb-hover img {
+    width: 300px;
+    height: auto;
+    display: block;
+    border-radius: 3px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo-mark">
+    <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M3 4h14v2H3V4zm0 5h14v2H3V9zm0 5h9v2H3v-2z" fill="#0d1117"/>
+      <circle cx="16" cy="15" r="3" fill="#0d1117" stroke="#0d1117" stroke-width="0"/>
+      <path d="M15 14l1.5 1.5L18 13" stroke="#0d1117" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </div>
+  <h1>Print File Downloader</h1>
+  <span class="sub">Unfulfilled Orders · Shopify Admin API</span>
+</header>
+
+<main>
+
+  <div id="setup-panel">
+    <div class="panel-header">
+      <div class="dot" id="conn-dot"></div>
+      <h2>Store Connection</h2>
+    </div>
+    <div class="panel-body">
+      <div class="field-row">
+        <div class="field">
+          <label>Store Domain</label>
+          <input type="text" id="store-domain" placeholder="yourstore.myshopify.com" autocomplete="off" spellcheck="false">
+          <span class="field-hint">Your .myshopify.com domain</span>
+        </div>
+        <div class="field">
+          <label>Admin API Token</label>
+          <input type="password" id="api-token" placeholder="shpat_••••••••••••••••••••••" autocomplete="off">
+          <span class="field-hint">Private app token with Orders read access</span>
+        </div>
+      </div>
+      <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+        <button class="btn btn-primary" onclick="loadOrders()">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1v10M1 6l5-5 5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Load Unfulfilled Orders
+        </button>
+        <button class="btn btn-ghost" onclick="saveCredentials()" title="Save to localStorage">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 2h7l1 1v7a1 1 0 01-1 1H2a1 1 0 01-1-1V3a1 1 0 011-1zm2 0v3h4V2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Save Credentials
+        </button>
+        <button class="btn btn-ghost" onclick="clearCredentials()" title="Clear saved credentials">Clear Saved</button>
+      </div>
+      <div id="status-bar"></div>
+    </div>
+  </div>
+
+  <div id="orders-panel">
+
+    <!-- Date filter bar -->
+    <div style="display:flex; gap:10px; align-items:center; margin-bottom:16px; flex-wrap:wrap; background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:10px 14px;">
+      <label style="font-family:var(--mono); font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:0.1em; color:var(--text-sec);">Filter by date:</label>
+      <input type="date" id="filter-from" onchange="applyDateFilter()" style="background:var(--bg); border:1px solid var(--border); border-radius:5px; padding:6px 10px; color:var(--text); font-family:var(--mono); font-size:12px; outline:none; color-scheme:dark;">
+      <span style="font-family:var(--mono); font-size:11px; color:var(--text-sec);">→</span>
+      <input type="date" id="filter-to" onchange="applyDateFilter()" style="background:var(--bg); border:1px solid var(--border); border-radius:5px; padding:6px 10px; color:var(--text); font-family:var(--mono); font-size:12px; outline:none; color-scheme:dark;">
+      <button class="btn btn-ghost" style="padding:6px 14px; font-size:11px;" onclick="clearDateFilter()">Clear</button>
+      <span id="filter-status" style="font-family:var(--mono); font-size:11px; color:var(--accent); margin-left:4px;"></span>
+    </div>
+
+    <!-- Enhancement panel -->
+    <div id="enhance-panel">
+      <div class="panel-header" onclick="toggleEnhancePanel()">
+        <div class="dot" id="enhance-dot"></div>
+        <h2>Image Enhancements</h2>
+        <span id="enhance-toggle-icon">▾</span>
+      </div>
+      <div id="enhance-body" style="display:none;">
+        <div class="preset-controls">
+          <label>Preset:</label>
+          <select id="active-preset-select" class="preset-select" onchange="setActivePreset(this.value)">
+            <option value="">None (original files)</option>
+          </select>
+          <button class="btn btn-ghost" style="padding:6px 14px; font-size:11px;" onclick="openPresetEditor(null)">+ New Preset</button>
+          <button class="btn btn-ghost" id="edit-preset-btn" style="padding:6px 14px; font-size:11px;" onclick="openPresetEditor(activePresetId)" disabled>Edit</button>
+          <button class="btn btn-danger" id="del-preset-btn" style="padding:6px 14px; font-size:11px;" onclick="confirmDeletePreset()" disabled>Delete</button>
+        </div>
+
+        <!-- Inline editor -->
+        <div id="preset-editor" style="display:none;">
+          <div class="editor-heading" id="editor-title">New Preset</div>
+          <div class="field" style="max-width:320px; margin-bottom:4px;">
+            <label>Preset Name</label>
+            <input type="text" id="editor-name" placeholder="e.g. Vivid Print">
+          </div>
+          <div class="sliders-grid">
+            <div class="slider-group">
+              <div class="slider-label">
+                <span class="sname">Brightness</span>
+                <span class="sval" id="v-brightness">0</span>
+              </div>
+              <input type="range" min="-100" max="100" value="0" id="s-brightness" oninput="syncSlider('brightness')">
+              <div class="slider-range-hint"><span>-100</span><span>+100</span></div>
+            </div>
+            <div class="slider-group">
+              <div class="slider-label">
+                <span class="sname">Contrast</span>
+                <span class="sval" id="v-contrast">0</span>
+              </div>
+              <input type="range" min="-100" max="100" value="0" id="s-contrast" oninput="syncSlider('contrast')">
+              <div class="slider-range-hint"><span>-100</span><span>+100</span></div>
+            </div>
+            <div class="slider-group">
+              <div class="slider-label">
+                <span class="sname">Saturation</span>
+                <span class="sval" id="v-saturation">0</span>
+              </div>
+              <input type="range" min="-100" max="100" value="0" id="s-saturation" oninput="syncSlider('saturation')">
+              <div class="slider-range-hint"><span>-100</span><span>+100</span></div>
+            </div>
+            <div class="slider-group">
+              <div class="slider-label">
+                <span class="sname">Vibrance</span>
+                <span class="sval" id="v-vibrance">0</span>
+              </div>
+              <input type="range" min="-100" max="100" value="0" id="s-vibrance" oninput="syncSlider('vibrance')">
+              <div class="slider-range-hint"><span>-100</span><span>+100</span></div>
+            </div>
+            <div class="slider-group">
+              <div class="slider-label">
+                <span class="sname">Sharpness</span>
+                <span class="sval" id="v-sharpness">0</span>
+              </div>
+              <input type="range" min="0" max="100" value="0" id="s-sharpness" oninput="syncSlider('sharpness')">
+              <div class="slider-range-hint"><span>0</span><span>100</span></div>
+            </div>
+          </div>
+          <div style="display:flex; gap:10px;">
+            <button class="btn btn-primary" style="font-size:11px; padding:8px 16px;" onclick="savePreset()">Save Preset</button>
+            <button class="btn btn-ghost" style="font-size:11px; padding:8px 16px;" onclick="closePresetEditor()">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="toolbar">
+      <div class="toolbar-left">
+        <div class="count-badge">
+          <span id="selected-count">0</span> selected / <span id="total-count">0</span> orders
+        </div>
+        <div class="count-badge">
+          <span id="file-count-badge">0</span> print files
+        </div>
+        <div id="enhance-indicator">No Enhancement</div>
+      </div>
+      <div class="toolbar-right">
+        <button class="btn btn-ghost" onclick="selectAll()">Select All</button>
+        <button class="btn btn-ghost" onclick="selectNone()">Clear</button>
+        <button class="btn btn-success" id="download-btn" onclick="downloadSelected()" disabled>
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 1v8M3 6l3.5 3.5L10 6M1 11h11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Download ZIP
+        </button>
+      </div>
+    </div>
+
+    <div class="order-table">
+      <div class="table-head">
+        <input type="checkbox" id="select-all" onchange="toggleSelectAll(this.checked)">
+        <span>Preview</span>
+        <span>Order</span>
+        <span>Date</span>
+        <span>Files</span>
+        <span style="text-align:center;">Count</span>
+        <span style="text-align:center;">Apply</span>
+      </div>
+      <div id="order-list">
+        <div class="empty-state">
+          <p>No orders loaded yet.</p>
+        </div>
+      </div>
+    </div>
+
+    <div id="progress-wrap">
+      <div class="progress-header">
+        <span id="progress-label">Downloading</span>
+        <span id="progress-pct">0%</span>
+      </div>
+      <div class="progress-track">
+        <div id="progress-bar"></div>
+      </div>
+      <div id="progress-log"></div>
+    </div>
+  </div>
+
+</main>
+
+<footer>
+  <span>PRINT FILE DOWNLOADER v1.1 · GITHUB PAGES</span>
+  <span id="footer-store"></span>
+</footer>
+
+<script>
+// ── PROXY ─────────────────────────────────────────────────────────
+const PROXY_URL = 'https://shopify-proxy.salve.workers.dev';
+
+// ── STATE ──────────────────────────────────────────────────────────
+let orders = [];
+let filteredOrders = [];
+let selected = new Set();
+let enhancedOrders = new Set(); // order IDs marked for enhancement
+
+// ── CREDENTIALS ───────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  const d = localStorage.getItem('pfd_domain');
+  const t = localStorage.getItem('pfd_token');
+  if (d) document.getElementById('store-domain').value = d;
+  if (t) document.getElementById('api-token').value = t;
+  if (d && t) setStatus('Saved credentials loaded. Click Load to fetch orders.', 'info');
+  loadPresetsFromStorage();
+  renderPresetSelect();
+  setupHoverPreview();
+});
+
+function saveCredentials() {
+  const d = domain(), t = token();
+  if (!d || !t) { setStatus('Enter domain and token before saving.', 'error'); return; }
+  localStorage.setItem('pfd_domain', d);
+  localStorage.setItem('pfd_token', t);
+  setStatus('Credentials saved to browser storage.', 'ok');
+}
+
+function clearCredentials() {
+  localStorage.removeItem('pfd_domain');
+  localStorage.removeItem('pfd_token');
+  setStatus('Saved credentials cleared.', 'info');
+}
+
+function domain() { return document.getElementById('store-domain').value.trim().replace(/\/$/, ''); }
+function token()  { return document.getElementById('api-token').value.trim(); }
+
+// ── STATUS BAR ────────────────────────────────────────────────────
+function setStatus(msg, type) {
+  const el = document.getElementById('status-bar');
+  el.textContent = msg;
+  el.className = type;
+  el.style.display = 'block';
+}
+
+// ── VARIANT → SUFFIX ──────────────────────────────────────────────
+function deriveSuffix(variantTitle, options) {
+  const haystack = [variantTitle, ...(options || [])].join(' ').toLowerCase();
+  if (/28["”]?\s*x\s*16/.test(haystack))            return 'EXP';
+  if (/28["”]?\s*x\s*14/.test(haystack))            return 'EXT';
+  if (/\bref\b|reflective/.test(haystack))               return 'REF';
+  if (/\bclr\b|clear|stitched clear/.test(haystack))     return 'CLR';
+  if (/\bblk\b|black|stitched black/.test(haystack))     return 'BLK';
+  if (/\buns\b|unstitched|no stitch/.test(haystack))     return 'UNS';
+  return 'UNK';
+}
+
+// ── LOAD ORDERS ───────────────────────────────────────────────────
+async function loadOrders() {
+  const d = domain(), t = token();
+  if (!d || !t) { setStatus('Please enter your store domain and API token.', 'error'); return; }
+
+  setStatus('Fetching unfulfilled orders…', 'info');
+  document.getElementById('conn-dot').className = 'dot';
+
+  let allOrders = [];
+  let pageInfo  = null;
+  let hasMore   = true;
+
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+  try {
+    while (hasMore) {
+      const query    = pageInfo ? `limit=250&page_info=${pageInfo}` : `status=unfulfilled&limit=250&fields=id,order_number,name,created_at,fulfillment_status,line_items`;
+      const proxyUrl = `${PROXY_URL}?shop=${encodeURIComponent(d)}&query=${encodeURIComponent(query)}`;
+
+      let res;
+      let backoff = 1000;
+      for (let attempt = 0; attempt < 5; attempt++) {
+        res = await fetch(proxyUrl, {
+          headers: { 'X-Shopify-Token': t, 'Content-Type': 'application/json' }
+        });
+        if (res.status !== 429) break;
+        setStatus(`Rate limited — retrying in ${backoff / 1000}s…`, 'info');
+        await sleep(backoff);
+        backoff *= 2;
+      }
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        const errMsg = typeof err.errors === 'string' ? err.errors : JSON.stringify(err.errors || err);
+        throw new Error(`API error ${res.status}: ${errMsg}`);
+      }
+      const data = await res.json();
+      allOrders = allOrders.concat(data.orders || []);
+      const link = res.headers.get('X-Link') || '';
+      const next = link.match(/page_info=([^&>]+)[^>]*>;\s*rel="next"/);
+      if (next) { pageInfo = next[1]; await sleep(550); } else { hasMore = false; }
+    }
+  } catch (e) {
+    setStatus(`Error: ${e.message}`, 'error');
+    document.getElementById('conn-dot').className = 'dot';
+    return;
+  }
+
+  orders = [];
+  for (const o of allOrders) {
+    const fs = (o.fulfillment_status || '').toLowerCase();
+    if (fs === 'fulfilled' || fs === 'partial') continue;
+
+    const isEtsy = (o.name || '').toUpperCase().startsWith('ETSY-');
+    const displayOrderNumber = isEtsy ? o.name.replace(/^ETSY-/i, '') : o.order_number;
+
+    const lineItems = [];
+    for (const li of (o.line_items || [])) {
+      const props = li.properties || [];
+
+      // Collect ALL unique playmatstudio URLs from print file properties only (skip thumbnails).
+      const fileUrls = [];
+      for (const p of props) {
+        if (typeof p.value !== 'string') continue;
+        if ((p.name || '').toLowerCase().includes('thumb')) continue;
+        const hits = [...p.value.matchAll(/(https:\/\/files\.playmatstudio\.com\/[^"\s<>]+)/gi)];
+        for (const m of hits) {
+          const url = m[1].replace(/[.,;!?)\]'"]+$/, '').replace(/["']$/, '');
+          if (!fileUrls.includes(url)) fileUrls.push(url);
+        }
+      }
+
+      if (fileUrls.length === 0) continue;
+
+      const suffix = deriveSuffix(li.variant_title || li.title || '', [
+        li.variant_title,
+        (li.properties || []).find(p => p.name === 'Edge Style')?.value,
+        (li.properties || []).find(p => p.name === 'Stitching')?.value,
+        (li.properties || []).find(p => p.name === 'Finish')?.value,
+      ]);
+
+      const variantTitle = li.variant_title || li.title || '';
+      const dblHaystack = [variantTitle, ...(li.properties || []).map(p => String(p.value || ''))].join(' ').toLowerCase();
+      const isDbl = fileUrls.length > 1 && /\bdbl\b|double[- ]?sided|double/i.test(dblHaystack);
+
+      fileUrls.forEach((fileUrl, urlIdx) => {
+        lineItems.push({ fileUrl, suffix, variantTitle, isDbl, dblIdx: urlIdx + 1 });
+      });
+    }
+    if (lineItems.length === 0) continue;
+    orders.push({ id: o.id, number: displayOrderNumber, date: new Date(o.created_at), lineItems });
+  }
+
+  orders.sort((a, b) => b.date - a.date);
+
+  document.getElementById('conn-dot').className = 'dot green';
+  document.getElementById('footer-store').textContent = d.replace('.myshopify.com', '').toUpperCase();
+  setStatus(`Loaded ${allOrders.length} unfulfilled orders — ${orders.length} with print files.`, 'ok');
+
+  filteredOrders = [...orders];
+  renderOrders();
+  document.getElementById('orders-panel').style.display = 'block';
+  updateSelectionUI();
+}
+
+// ── DATE FILTER ──────────────────────────────────────────────────
+function applyDateFilter() {
+  const fromVal = document.getElementById('filter-from').value;
+  const toVal   = document.getElementById('filter-to').value;
+  const from    = fromVal ? new Date(fromVal + 'T00:00:00') : null;
+  const to      = toVal   ? new Date(toVal   + 'T23:59:59') : null;
+  filteredOrders = orders.filter(o => {
+    if (from && o.date < from) return false;
+    if (to   && o.date > to)   return false;
+    return true;
+  });
+  const fs = document.getElementById('filter-status');
+  if (from || to) {
+    fs.textContent = `${filteredOrders.length} of ${orders.length} orders shown`;
+  } else {
+    fs.textContent = '';
+  }
+  selected.clear();
+  renderOrders();
+  updateSelectionUI();
+}
+
+function clearDateFilter() {
+  document.getElementById('filter-from').value = '';
+  document.getElementById('filter-to').value   = '';
+  document.getElementById('filter-status').textContent = '';
+  filteredOrders = [...orders];
+  selected.clear();
+  renderOrders();
+  updateSelectionUI();
+}
+
+// ── RENDER ────────────────────────────────────────────────────────
+function fmt(date) {
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function renderOrders() {
+  const list = document.getElementById('order-list');
+  document.getElementById('total-count').textContent = filteredOrders.length;
+
+  if (filteredOrders.length === 0) {
+    list.innerHTML = '<div class="empty-state"><p>No orders match the current filter.</p></div>';
+    return;
+  }
+
+  list.innerHTML = filteredOrders.map(o => {
+    const chipsHtml = o.lineItems.map(li => `
+      <div class="file-chip" title="${li.variantTitle}">
+        <span class="suffix ${li.suffix}">${li.suffix}</span>
+        ${li.isDbl ? `<span class="suffix" style="background:rgba(63,185,80,0.15);color:#3fb950;">DBL${li.dblIdx}</span>` : ''}
+        ${li.variantTitle || 'Print File'}
+      </div>
+    `).join('');
+
+    const hasPreset  = !!activePresetId;
+    const isEnhanced = enhancedOrders.has(o.id);
+    const enhClass   = (hasPreset && isEnhanced) ? 'enhance-btn active' : 'enhance-btn';
+    const enhLabel   = !hasPreset ? '· No Preset' : (isEnhanced ? '✓ Enhanced' : 'Enhance');
+
+    return `
+      <div class="order-row" id="row-${o.id}" onclick="toggleRow(${o.id})">
+        <input type="checkbox" id="chk-${o.id}" onclick="event.stopPropagation(); toggleRow(${o.id})">
+        <div class="thumb-cell" onclick="event.stopPropagation();">
+          <div class="thumb-placeholder" data-order-id="${o.id}">· · ·</div>
+        </div>
+        <div class="order-num">#${o.number}</div>
+        <div class="order-date">${fmt(o.date)}</div>
+        <div class="order-files">${chipsHtml}</div>
+        <div class="file-count">${o.lineItems.length}</div>
+        <div onclick="event.stopPropagation();">
+          <button class="${enhClass}" id="enhance-btn-${o.id}"
+            onclick="toggleEnhance(${o.id})" ${hasPreset ? '' : 'disabled'}>${enhLabel}</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  // Observe all thumbnail placeholders for lazy loading
+  document.querySelectorAll('.thumb-placeholder').forEach(el => thumbObserver.observe(el));
+}
+
+// ── LAZY THUMBNAIL LOADING ────────────────────────────────────────
+const thumbObserver = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (!entry.isIntersecting) return;
+    thumbObserver.unobserve(entry.target);
+    loadThumbnail(entry.target);
+  });
+}, { rootMargin: '120px' });
+
+async function loadThumbnail(placeholder) {
+  const orderId = placeholder.dataset.orderId;
+  const order   = orders.find(o => String(o.id) === String(orderId));
+  if (!order || !order.lineItems[0]) return;
+
+  placeholder.textContent = 'Loading…';
+  placeholder.classList.add('loading');
+
+  try {
+    const res = await fetch(order.lineItems[0].fileUrl);
+    if (!res.ok) throw new Error('fetch failed');
+    const blob   = await res.blob();
+    const objUrl = URL.createObjectURL(blob);
+    const img    = document.createElement('img');
+    img.alt      = `Order #${order.number}`;
+    // Keep objUrl alive (not revoked) so the hover preview can reuse img.src
+    img.onerror  = () => {
+      URL.revokeObjectURL(objUrl);
+      placeholder.textContent = 'Error';
+      placeholder.classList.remove('loading');
+      placeholder.classList.add('error');
+    };
+    img.src = objUrl;
+    placeholder.replaceWith(img);
+  } catch (e) {
+    placeholder.textContent = 'Error';
+    placeholder.classList.remove('loading');
+    placeholder.classList.add('error');
+  }
+}
+
+// ── SELECTION ─────────────────────────────────────────────────────
+function toggleRow(id) {
+  if (selected.has(id)) {
+    selected.delete(id);
+    document.getElementById(`row-${id}`).classList.remove('selected');
+    document.getElementById(`chk-${id}`).checked = false;
+  } else {
+    selected.add(id);
+    document.getElementById(`row-${id}`).classList.add('selected');
+    document.getElementById(`chk-${id}`).checked = true;
+  }
+  updateSelectionUI();
+}
+
+function selectAll()  {
+  filteredOrders.forEach(o => {
+    selected.add(o.id);
+    document.getElementById(`row-${o.id}`).classList.add('selected');
+    document.getElementById(`chk-${o.id}`).checked = true;
+  });
+  updateSelectionUI();
+}
+function selectNone() {
+  filteredOrders.forEach(o => {
+    selected.delete(o.id);
+    document.getElementById(`row-${o.id}`).classList.remove('selected');
+    document.getElementById(`chk-${o.id}`).checked = false;
+  });
+  updateSelectionUI();
+}
+function toggleSelectAll(checked) { checked ? selectAll() : selectNone(); }
+
+function updateSelectionUI() {
+  const sel       = selected.size;
+  const fileCount = filteredOrders.filter(o => selected.has(o.id)).reduce((n, o) => n + o.lineItems.length, 0);
+  document.getElementById('selected-count').textContent  = sel;
+  document.getElementById('file-count-badge').textContent = fileCount;
+  document.getElementById('download-btn').disabled       = sel === 0;
+  document.getElementById('select-all').checked          = sel > 0 && sel === filteredOrders.length;
+}
+
+// ── PER-ORDER ENHANCE TOGGLE ─────────────────────────────────────
+function toggleEnhance(id) {
+  if (!activePresetId) return;
+  if (enhancedOrders.has(id)) {
+    enhancedOrders.delete(id);
+  } else {
+    enhancedOrders.add(id);
+  }
+  const isEnhanced = enhancedOrders.has(id);
+  const btn = document.getElementById(`enhance-btn-${id}`);
+  if (btn) {
+    btn.className   = isEnhanced ? 'enhance-btn active' : 'enhance-btn';
+    btn.textContent = isEnhanced ? '✓ Enhanced' : 'Enhance';
+  }
+  updateEnhanceIndicator();
+}
+
+function updateEnhanceButtons() {
+  filteredOrders.forEach(o => {
+    const btn = document.getElementById(`enhance-btn-${o.id}`);
+    if (!btn) return;
+    if (!activePresetId) {
+      btn.disabled    = true;
+      btn.className   = 'enhance-btn';
+      btn.textContent = '· No Preset';
+    } else {
+      btn.disabled    = false;
+      const isEnhanced = enhancedOrders.has(o.id);
+      btn.className   = isEnhanced ? 'enhance-btn active' : 'enhance-btn';
+      btn.textContent = isEnhanced ? '✓ Enhanced' : 'Enhance';
+    }
+  });
+  updateEnhanceIndicator();
+}
+
+// ── THUMBNAIL HOVER PREVIEW ──────────────────────────────────────
+function setupHoverPreview() {
+  const hoverEl = document.createElement('div');
+  hoverEl.id = 'thumb-hover';
+  document.body.appendChild(hoverEl);
+
+  let activeCell = null;
+
+  document.getElementById('order-list').addEventListener('mouseover', e => {
+    const cell = e.target.closest('.thumb-cell');
+    if (!cell || cell === activeCell) return;
+    activeCell = cell;
+    const img = cell.querySelector('img');
+    if (!img) { hoverEl.style.display = 'none'; return; }
+    hoverEl.innerHTML = '';
+    const big = document.createElement('img');
+    big.src = img.src;
+    hoverEl.appendChild(big);
+    hoverEl.style.display = 'block';
+  });
+
+  document.addEventListener('mousemove', e => {
+    if (hoverEl.style.display === 'none') return;
+    const PW = 318; // preview width + padding
+    const x  = e.clientX + 20;
+    const y  = e.clientY - 40;
+    const ph = hoverEl.offsetHeight || 220;
+    hoverEl.style.left = (x + PW > window.innerWidth ? e.clientX - PW - 10 : x) + 'px';
+    hoverEl.style.top  = Math.max(8, Math.min(y, window.innerHeight - ph - 8)) + 'px';
+  });
+
+  document.getElementById('order-list').addEventListener('mouseout', e => {
+    if (!e.relatedTarget || !e.relatedTarget.closest('.thumb-cell')) {
+      hoverEl.style.display = 'none';
+      activeCell = null;
+    }
+  });
+
+  document.getElementById('order-list').addEventListener('mouseleave', () => {
+    hoverEl.style.display = 'none';
+    activeCell = null;
+  });
+}
+
+// ── PRESET MANAGEMENT ─────────────────────────────────────────────
+let presets        = [];
+let activePresetId = null;
+let editingPresetId = null; // null = creating new
+
+function loadPresetsFromStorage() {
+  try {
+    const saved = localStorage.getItem('pfd_presets');
+    if (saved) presets = JSON.parse(saved);
+  } catch(e) { presets = []; }
+}
+
+function savePresetsToStorage() {
+  localStorage.setItem('pfd_presets', JSON.stringify(presets));
+}
+
+function renderPresetSelect() {
+  const sel = document.getElementById('active-preset-select');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">None (original files)</option>';
+  presets.forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p.id;
+    opt.textContent = p.name;
+    sel.appendChild(opt);
+  });
+  if (activePresetId) sel.value = activePresetId;
+  updateEnhanceIndicator();
+}
+
+function setActivePreset(id) {
+  activePresetId = id || null;
+  document.getElementById('edit-preset-btn').disabled = !id;
+  document.getElementById('del-preset-btn').disabled  = !id;
+  updateEnhanceButtons();
+}
+
+function updateEnhanceIndicator() {
+  const el = document.getElementById('enhance-indicator');
+  if (!activePresetId) {
+    el.textContent = 'No Enhancement';
+    el.className   = '';
+    el.id          = 'enhance-indicator';
+    return;
+  }
+  const p          = presets.find(x => x.id === activePresetId);
+  const markedCount = filteredOrders.filter(o => enhancedOrders.has(o.id)).length;
+  el.textContent   = p
+    ? (markedCount > 0 ? `${p.name} · ${markedCount} marked` : `Preset: ${p.name}`)
+    : 'No Enhancement';
+  el.className     = markedCount > 0 ? 'active' : '';
+  el.id            = 'enhance-indicator';
+}
+
+function toggleEnhancePanel() {
+  const body = document.getElementById('enhance-body');
+  const icon = document.getElementById('enhance-toggle-icon');
+  const open = body.style.display !== 'none';
+  body.style.display = open ? 'none' : 'block';
+  icon.classList.toggle('open', !open);
+}
+
+// ── PRESET EDITOR ─────────────────────────────────────────────────
+const PARAMS = ['brightness', 'contrast', 'saturation', 'vibrance', 'sharpness'];
+
+function syncSlider(name) {
+  document.getElementById(`v-${name}`).textContent = document.getElementById(`s-${name}`).value;
+}
+
+function openPresetEditor(id) {
+  editingPresetId = id || null;
+  const editor = document.getElementById('preset-editor');
+  const title  = document.getElementById('editor-title');
+
+  // Expand panel if collapsed
+  const body = document.getElementById('enhance-body');
+  if (body.style.display === 'none') toggleEnhancePanel();
+
+  if (id) {
+    const p = presets.find(x => x.id === id);
+    if (!p) return;
+    title.textContent = 'Edit Preset';
+    document.getElementById('editor-name').value = p.name;
+    PARAMS.forEach(name => {
+      const val = p[name] ?? 0;
+      document.getElementById(`s-${name}`).value = val;
+      document.getElementById(`v-${name}`).textContent = val;
+    });
+  } else {
+    title.textContent = 'New Preset';
+    document.getElementById('editor-name').value = '';
+    PARAMS.forEach(name => {
+      document.getElementById(`s-${name}`).value = 0;
+      document.getElementById(`v-${name}`).textContent = 0;
+    });
+  }
+
+  editor.style.display = 'block';
+  document.getElementById('editor-name').focus();
+}
+
+function closePresetEditor() {
+  document.getElementById('preset-editor').style.display = 'none';
+  editingPresetId = null;
+}
+
+function savePreset() {
+  const name = document.getElementById('editor-name').value.trim();
+  if (!name) {
+    document.getElementById('editor-name').focus();
+    return;
+  }
+  const values = {};
+  PARAMS.forEach(n => { values[n] = parseInt(document.getElementById(`s-${n}`).value, 10); });
+
+  if (editingPresetId) {
+    const p = presets.find(x => x.id === editingPresetId);
+    if (p) { p.name = name; Object.assign(p, values); }
+  } else {
+    presets.push({ id: `p_${Date.now()}`, name, ...values });
+  }
+
+  savePresetsToStorage();
+  renderPresetSelect();
+  if (!editingPresetId) {
+    // Auto-select the new preset
+    const newId = presets[presets.length - 1].id;
+    document.getElementById('active-preset-select').value = newId;
+    setActivePreset(newId);
+  }
+  closePresetEditor();
+}
+
+function confirmDeletePreset() {
+  if (!activePresetId) return;
+  const p = presets.find(x => x.id === activePresetId);
+  if (!p) return;
+  if (!confirm(`Delete preset "${p.name}"?`)) return;
+  presets = presets.filter(x => x.id !== activePresetId);
+  savePresetsToStorage();
+  activePresetId = null;
+  document.getElementById('active-preset-select').value = '';
+  setActivePreset(null);
+  renderPresetSelect();
+  closePresetEditor();
+}
+
+// ── IMAGE PROCESSING ──────────────────────────────────────────────
+
+function applyBrightness(data, value) {
+  const v = value * 2.55;
+  for (let i = 0; i < data.length; i += 4) {
+    data[i]     = Math.max(0, Math.min(255, data[i]     + v));
+    data[i + 1] = Math.max(0, Math.min(255, data[i + 1] + v));
+    data[i + 2] = Math.max(0, Math.min(255, data[i + 2] + v));
+  }
+}
+
+function applyContrast(data, value) {
+  const factor = (259 * (value + 255)) / (255 * (259 - value));
+  for (let i = 0; i < data.length; i += 4) {
+    data[i]     = Math.max(0, Math.min(255, factor * (data[i]     - 128) + 128));
+    data[i + 1] = Math.max(0, Math.min(255, factor * (data[i + 1] - 128) + 128));
+    data[i + 2] = Math.max(0, Math.min(255, factor * (data[i + 2] - 128) + 128));
+  }
+}
+
+function applySaturation(data, value) {
+  const factor = 1 + value / 100;
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i], g = data[i + 1], b = data[i + 2];
+    const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+    data[i]     = Math.max(0, Math.min(255, gray + (r - gray) * factor));
+    data[i + 1] = Math.max(0, Math.min(255, gray + (g - gray) * factor));
+    data[i + 2] = Math.max(0, Math.min(255, gray + (b - gray) * factor));
+  }
+}
+
+function applyVibrance(data, value) {
+  const amount = value / 100;
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i], g = data[i + 1], b = data[i + 2];
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    const currentSat = (max - min) / 255;
+    const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+    // Less-saturated pixels receive a proportionally larger boost
+    const boost = amount * (1 - currentSat);
+    data[i]     = Math.max(0, Math.min(255, gray + (r - gray) * (1 + boost)));
+    data[i + 1] = Math.max(0, Math.min(255, gray + (g - gray) * (1 + boost)));
+    data[i + 2] = Math.max(0, Math.min(255, gray + (b - gray) * (1 + boost)));
+  }
+}
+
+function applySharpness(imageData, value) {
+  if (value === 0) return;
+  const { data, width, height } = imageData;
+  const strength = value / 100;
+  // Snapshot current pixel data before writing back
+  const src = new Uint8ClampedArray(data);
+  for (let y = 1; y < height - 1; y++) {
+    for (let x = 1; x < width - 1; x++) {
+      const i = (y * width + x) * 4;
+      for (let c = 0; c < 3; c++) {
+        const center = src[i + c];
+        const top    = src[((y - 1) * width + x) * 4 + c];
+        const bottom = src[((y + 1) * width + x) * 4 + c];
+        const left   = src[(y * width + (x - 1)) * 4 + c];
+        const right  = src[(y * width + (x + 1)) * 4 + c];
+        // Unsharp-mask: blend original with laplacian edge emphasis
+        data[i + c] = Math.max(0, Math.min(255,
+          center + strength * (4 * center - top - bottom - left - right)
+        ));
+      }
+    }
+  }
+}
+
+function blobToImage(blob) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(blob);
+    const img = new Image();
+    img.onload  = () => { URL.revokeObjectURL(url); resolve(img); };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Image load failed')); };
+    img.src = url;
+  });
+}
+
+async function processImageWithPreset(blob, preset) {
+  const img    = await blobToImage(blob);
+  const canvas = document.createElement('canvas');
+  canvas.width  = img.naturalWidth;
+  canvas.height = img.naturalHeight;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(img, 0, 0);
+
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const { data }  = imageData;
+
+  if (preset.brightness !== 0) applyBrightness(data, preset.brightness);
+  if (preset.contrast   !== 0) applyContrast(data, preset.contrast);
+  if (preset.saturation !== 0) applySaturation(data, preset.saturation);
+  if (preset.vibrance   !== 0) applyVibrance(data, preset.vibrance);
+  if (preset.sharpness  !== 0) applySharpness(imageData, preset.sharpness);
+
+  ctx.putImageData(imageData, 0, 0);
+
+  const mimeType = blob.type === 'image/png' ? 'image/png' : 'image/jpeg';
+  const quality  = mimeType === 'image/jpeg' ? 0.95 : undefined;
+
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(b => b ? resolve(b) : reject(new Error('toBlob failed')), mimeType, quality);
+  });
+}
+
+// ── DOWNLOAD ──────────────────────────────────────────────────────
+function logLine(msg, type = '') {
+  const now = new Date();
+  const ts  = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
+  const log = document.getElementById('progress-log');
+  const div = document.createElement('div');
+  div.className = `log-line ${type}`;
+  div.innerHTML = `<span class="ts">${ts}</span><span class="msg">${msg}</span>`;
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+}
+
+function setProgress(done, total) {
+  const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+  document.getElementById('progress-bar').style.width = pct + '%';
+  document.getElementById('progress-pct').textContent = pct + '%';
+}
+
+async function downloadSelected() {
+  const toDownload = filteredOrders.filter(o => selected.has(o.id));
+  if (toDownload.length === 0) return;
+
+  const preset = activePresetId ? presets.find(p => p.id === activePresetId) : null;
+
+  const fileList = [];
+  for (const o of toDownload) {
+    // Single-sided files only get a -N counter when there are multiple of them
+    const singleFiles   = o.lineItems.filter(li => !li.isDbl);
+    const needsSingleIdx = singleFiles.length > 1;
+    let singleCounter   = 0;
+
+    o.lineItems.forEach(li => {
+      let ext = 'jpg';
+      const extMatch = li.fileUrl.match(/\.([a-zA-Z0-9]+)(?:[\?#].*)?$/);
+      if (extMatch) ext = extMatch[1].toLowerCase();
+
+      let name;
+      if (li.isDbl) {
+        // Two URLs from the same line item → double-sided product
+        name = `${o.number}-${li.suffix}-DBL${li.dblIdx}.${ext}`;
+      } else {
+        singleCounter++;
+        name = needsSingleIdx
+          ? `${o.number}-${li.suffix}-${singleCounter}.${ext}`
+          : `${o.number}-${li.suffix}.${ext}`;
+      }
+      fileList.push({ name, url: li.fileUrl, order: o.number, orderId: o.id });
+    });
+  }
+
+  const markedCount = preset ? toDownload.filter(o => enhancedOrders.has(o.id)).length : 0;
+  const total = fileList.length;
+  let done = 0, failed = 0;
+
+  document.getElementById('progress-wrap').style.display = 'block';
+  document.getElementById('progress-log').innerHTML = '';
+  document.getElementById('progress-label').textContent = markedCount > 0 ? `Processing (${preset.name})` : 'Downloading';
+  setProgress(0, total);
+
+  const startMsg = markedCount > 0
+    ? `Starting download — ${markedCount} order${markedCount !== 1 ? 's' : ''} will use preset "${preset.name}"…`
+    : `Starting download of ${total} file${total !== 1 ? 's' : ''} from ${toDownload.length} orders…`;
+  logLine(startMsg, 'info');
+
+  const btn = document.getElementById('download-btn');
+  btn.disabled    = true;
+  btn.textContent = 'Packaging…';
+
+  const zip = new JSZip();
+
+  for (const f of fileList) {
+    try {
+      const res = await fetch(f.url);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const rawBlob      = await res.blob();
+      const shouldEnhance = preset && enhancedOrders.has(f.orderId);
+      const finalBlob    = shouldEnhance ? await processImageWithPreset(rawBlob, preset) : rawBlob;
+      zip.file(f.name, finalBlob);
+      done++;
+      setProgress(done + failed, total);
+      logLine(`✓ ${f.name}${shouldEnhance ? ' (enhanced)' : ''}`, 'ok');
+    } catch (e) {
+      failed++;
+      setProgress(done + failed, total);
+      logLine(`✗ ${f.name} — ${e.message}`, 'fail');
+    }
+  }
+
+  logLine(`Generating ZIP (${done} files)…`, 'info');
+
+  try {
+    const zipBlob = await zip.generateAsync({ type: 'blob', compression: 'STORE' });
+    const dateStr = new Date().toISOString().slice(0, 10);
+    const zipName = `print-files-${dateStr}.zip`;
+    const a       = document.createElement('a');
+    a.href        = URL.createObjectURL(zipBlob);
+    a.download    = zipName;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    logLine(`Done — ${zipName} downloaded (${done} ok, ${failed} failed)`, 'ok');
+  } catch (e) {
+    logLine(`ZIP generation failed: ${e.message}`, 'fail');
+  }
+
+  document.getElementById('progress-label').textContent = 'Downloading';
+  btn.disabled = false;
+  btn.innerHTML = `<svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 1v8M3 6l3.5 3.5L10 6M1 11h11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Download ZIP`;
+}
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js');
+  });
+}
+</script>
+</body>
+</html>
