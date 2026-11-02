@@ -993,8 +993,9 @@ async function loadOrders() {
       const dblHaystack = [variantTitle, ...(li.properties || []).map(p => String(p.value || ''))].join(' ').toLowerCase();
       const isDbl = fileUrls.length > 1 && /\bdbl\b|double[- ]?sided|double/i.test(dblHaystack);
 
+      const qty = Math.max(1, parseInt(li.quantity, 10) || 1);
       fileUrls.forEach((fileUrl, urlIdx) => {
-        lineItems.push({ fileUrl, suffix, variantTitle, isDbl, dblIdx: urlIdx + 1 });
+        lineItems.push({ fileUrl, suffix, variantTitle, isDbl, dblIdx: urlIdx + 1, qty });
       });
     }
     if (lineItems.length === 0) continue;
@@ -1510,6 +1511,48 @@ async function processImageWithPreset(blob, preset) {
   });
 }
 
+// Sniff magic bytes — URL extensions and server content-types are unreliable.
+async function sniffImageType(blob) {
+  const b = new Uint8Array(await blob.slice(0, 16).arrayBuffer());
+  const ascii = (s, e) => String.fromCharCode(...b.slice(s, e));
+  if (b[0] === 0xFF && b[1] === 0xD8 && b[2] === 0xFF) return 'jpeg';
+  if (b[0] === 0x89 && ascii(1, 4) === 'PNG')          return 'png';
+  if (ascii(0, 4) === 'RIFF' && ascii(8, 12) === 'WEBP') return 'webp';
+  if (ascii(0, 3) === 'GIF')                            return 'gif';
+  if (ascii(0, 2) === 'BM')                             return 'bmp';
+  if (ascii(4, 8) === 'ftyp') {
+    const brand = ascii(8, 12);
+    if (/avi[fs]/.test(brand))      return 'avif';
+    if (/hei[cxs]|mif1/.test(brand)) return 'heic';
+  }
+  if ((b[0] === 0x49 && b[1] === 0x49) || (b[0] === 0x4D && b[1] === 0x4D)) return 'tiff';
+  return null;
+}
+
+async function normalizeImage(blob, url) {
+  const type = await sniffImageType(blob);
+  if (type === 'jpeg') return { blob, ext: 'jpg' };
+  if (type === 'png')  return { blob, ext: 'png' };
+
+  const label = (type || 'unknown format').toUpperCase();
+  try {
+    const img    = await blobToImage(blob);
+    const canvas = document.createElement('canvas');
+    canvas.width  = img.naturalWidth;
+    canvas.height = img.naturalHeight;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0);
+    const jpg = await new Promise((resolve, reject) =>
+      canvas.toBlob(b => b ? resolve(b) : reject(new Error('toBlob failed')), 'image/jpeg', 0.95));
+    return { blob: jpg, ext: 'jpg', convertedFrom: label };
+  } catch {
+    const urlExt = (url.match(/\.([a-zA-Z0-9]+)(?:[\?#].*)?$/) || [])[1];
+    return { blob, ext: (type || urlExt || 'bin').toLowerCase(), convertFailed: label };
+  }
+}
+
 // ── DOWNLOAD ──────────────────────────────────────────────────────
 function logLine(msg, type = '') {
   const now = new Date();
@@ -1544,20 +1587,17 @@ async function downloadSelected() {
     const suffixCounters = {};
 
     o.lineItems.forEach(li => {
-      let ext = 'jpg';
-      const extMatch = li.fileUrl.match(/\.([a-zA-Z0-9]+)(?:[\?#].*)?$/);
-      if (extMatch) ext = extMatch[1].toLowerCase();
-
-      let name;
+      let base;
       if (li.isDbl) {
-        name = `${o.number}-${li.suffix}-DBL${li.dblIdx}.${ext}`;
+        base = `${o.number}-${li.suffix}-DBL${li.dblIdx}`;
       } else if (suffixTotals[li.suffix] > 1) {
         suffixCounters[li.suffix] = (suffixCounters[li.suffix] || 0) + 1;
-        name = `${o.number}-${li.suffix}-${suffixCounters[li.suffix]}.${ext}`;
+        base = `${o.number}-${li.suffix}-${suffixCounters[li.suffix]}`;
       } else {
-        name = `${o.number}-${li.suffix}.${ext}`;
+        base = `${o.number}-${li.suffix}`;
       }
-      fileList.push({ name, url: li.fileUrl, order: o.number, orderId: o.id });
+      if (li.qty > 1) base += `-x${li.qty}`;
+      fileList.push({ base, url: li.fileUrl, order: o.number, orderId: o.id });
     });
   }
 
@@ -1582,20 +1622,32 @@ async function downloadSelected() {
   const zip = new JSZip();
 
   for (const f of fileList) {
+    let name = f.base;
     try {
       const res = await fetch(f.url);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const rawBlob      = await res.blob();
+      const rawBlob = await res.blob();
+      const { blob: normBlob, ext, convertedFrom, convertFailed } = await normalizeImage(rawBlob, f.url);
+      if (convertFailed) {
+        name = `${f.base}.${ext}`;
+        zip.file(name, normBlob);
+        done++;
+        setProgress(done + failed, total);
+        logLine(`⚠ ${name} — couldn't convert ${convertFailed} to JPG, saved original`, 'fail');
+        continue;
+      }
       const shouldEnhance = preset && enhancedOrders.has(f.orderId);
-      const finalBlob    = shouldEnhance ? await processImageWithPreset(rawBlob, preset) : rawBlob;
-      zip.file(f.name, finalBlob);
+      const finalBlob = shouldEnhance ? await processImageWithPreset(normBlob, preset) : normBlob;
+      name = `${f.base}.${ext}`;
+      zip.file(name, finalBlob);
       done++;
       setProgress(done + failed, total);
-      logLine(`✓ ${f.name}${shouldEnhance ? ' (enhanced)' : ''}`, 'ok');
+      const notes = [convertedFrom && `converted from ${convertedFrom}`, shouldEnhance && 'enhanced'].filter(Boolean);
+      logLine(`✓ ${name}${notes.length ? ` (${notes.join(', ')})` : ''}`, 'ok');
     } catch (e) {
       failed++;
       setProgress(done + failed, total);
-      logLine(`✗ ${f.name} — ${e.message}`, 'fail');
+      logLine(`✗ ${name} — ${e.message}`, 'fail');
     }
   }
 
