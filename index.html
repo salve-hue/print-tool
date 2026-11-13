@@ -924,7 +924,11 @@ async function loadOrders() {
 
   try {
     while (hasMore) {
-      const query    = pageInfo ? `limit=250&page_info=${pageInfo}` : `status=unfulfilled&limit=250&fields=id,order_number,name,created_at,fulfillment_status,line_items`;
+      // With page_info Shopify only accepts limit + fields; the filters carry over from the first request
+      const fields   = 'fields=id,order_number,name,created_at,fulfillment_status,line_items';
+      const query    = pageInfo
+        ? `limit=250&${fields}&page_info=${pageInfo}`
+        : `status=open&fulfillment_status=unshipped&limit=250&${fields}`;
       const proxyUrl = `${PROXY_URL}?shop=${encodeURIComponent(d)}&query=${encodeURIComponent(query)}`;
 
       let res;
@@ -957,9 +961,11 @@ async function loadOrders() {
   }
 
   orders = [];
+  let unfulfilledCount = 0;
   for (const o of allOrders) {
     const fs = (o.fulfillment_status || '').toLowerCase();
     if (fs === 'fulfilled' || fs === 'partial') continue;
+    unfulfilledCount++;
 
     const isEtsy = (o.name || '').toUpperCase().startsWith('ETSY-');
     const displayOrderNumber = isEtsy ? o.name.replace(/^ETSY-/i, '') : o.order_number;
@@ -1006,7 +1012,7 @@ async function loadOrders() {
 
   document.getElementById('conn-dot').className = 'dot green';
   document.getElementById('footer-store').textContent = d.replace('.myshopify.com', '').toUpperCase();
-  setStatus(`Loaded ${allOrders.length} unfulfilled orders — ${orders.length} with print files.`, 'ok');
+  setStatus(`Loaded ${unfulfilledCount} unfulfilled orders — ${orders.length} with print files.`, 'ok');
 
   filteredOrders = [...orders];
   renderOrders();
