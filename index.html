@@ -979,7 +979,8 @@ async function loadOrders() {
       for (const p of props) {
         if (typeof p.value !== 'string') continue;
         if ((p.name || '').toLowerCase().includes('thumb')) continue;
-        const hits = [...p.value.matchAll(/(https:\/\/(?:files\.playmatstudio\.com|pub-[a-f0-9]+\.r2\.dev)\/[^"\s<>]+)/gi)];
+        // Shopify CDN is limited to customer /uploads/ so product photos and preview images aren't picked up
+        const hits = [...p.value.matchAll(/(https:\/\/(?:files\.playmatstudio\.com|pub-[a-f0-9]+\.r2\.dev|cdn\.shopify\.com\/s\/files\/[\d\/]+\/uploads)\/[^"\s<>]+)/gi)];
         for (const m of hits) {
           const url = m[1].replace(/[.,;!?)\]'"]+$/, '').replace(/["']$/, '');
           if (!fileUrls.includes(url)) fileUrls.push(url);
